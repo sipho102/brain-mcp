@@ -33,12 +33,13 @@ EXCLUDED_DIR_PREFIXES: tuple[str, ...] = (
 )
 
 # PARA folder map: keyword -> (directory prefix, human description).
+# Descriptions match personal_jon's 90-meta/CONVENTIONS.md wording.
 PARA_FOLDERS: dict[str, tuple[str, str]] = {
-    "inbox": ("00-inbox", "Unsorted incoming notes awaiting triage"),
-    "projects": ("10-projects", "Active projects with a defined outcome"),
-    "areas": ("20-areas", "Ongoing areas of responsibility"),
-    "resources": ("30-resources", "Reference material and topics of interest"),
-    "archive": ("40-archive", "Inactive projects and areas"),
+    "inbox": ("00-inbox", "Unprocessed capture. Nothing stays here permanently."),
+    "projects": ("10-projects", "Has a defined outcome and an end. One folder per project."),
+    "areas": ("20-areas", "Ongoing responsibility with no end date."),
+    "resources": ("30-resources", "Reference material and topics of interest."),
+    "archive": ("40-archive", "Completed or abandoned projects and dormant areas."),
 }
 
 FRONTMATTER_SCHEMA: list[dict[str, Any]] = [
@@ -514,15 +515,68 @@ def _stringify_ts(value: Any) -> str | None:
     return str(value)
 
 
+_HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$", re.MULTILINE)
+# **type:** or **type**: or **Type**, anywhere on a line.
+_BOLD_LABEL_RE = re.compile(r"\*\*\s*([A-Za-z][A-Za-z0-9_ -]*?)\s*:?\s*\*\*:?")
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    seen: dict[str, None] = {}
+    for v in values:
+        seen.setdefault(v, None)
+    return list(seen.keys())
+
+
 def _extract_enum_values(text: str, field_name: str) -> list[str]:
     """Pull backtick-quoted enum values out of CONVENTIONS.md.
 
-    Heuristic: find a heading whose text contains `field_name` (e.g.
-    "### `type`" or "## Valid types"), then collect every `` `value` ``
-    token until the next heading of equal-or-higher level.
+    Two shapes are supported, tried in order:
+
+    1. A bold inline label, e.g. "**type:** `note`, `project`, ..." (this
+       vault's actual format — all three enums live under one "## Enums"
+       heading, distinguished only by bold labels). The section for a label
+       runs until the next bold label or the next heading, whichever comes
+       first.
+    2. A heading whose text contains `field_name` (e.g. "### `type`" or
+       "## Valid types"), collecting every `` `value` `` token until the
+       next heading of equal-or-higher level. Kept as a fallback for vaults
+       that document enums under their own subheading instead.
     """
-    heading_re = re.compile(r"^(#{1,6})\s+(.*)$", re.MULTILINE)
-    headings = list(heading_re.finditer(text))
+    values = _extract_via_bold_label(text, field_name)
+    if values:
+        return values
+    return _extract_via_heading(text, field_name)
+
+
+def _extract_via_bold_label(text: str, field_name: str) -> list[str]:
+    labels = list(_BOLD_LABEL_RE.finditer(text))
+    for i, m in enumerate(labels):
+        if m.group(1).strip().lower() != field_name.lower():
+            continue
+        start = m.end()
+        # Bound the section as tightly as possible: the enum list is a
+        # single (possibly soft-wrapped) paragraph right after the label.
+        # Stopping at the first blank line keeps out any bulleted
+        # explanations or prose below that happen to backtick-quote an
+        # unrelated word (e.g. "`domain` is the primary query axis...").
+        end = len(text)
+        blank_line = re.search(r"\n[ \t]*\n", text[start:])
+        if blank_line:
+            end = min(end, start + blank_line.start())
+        if i + 1 < len(labels):
+            end = min(end, labels[i + 1].start())
+        heading_after = _HEADING_RE.search(text, start)
+        if heading_after:
+            end = min(end, heading_after.start())
+        section = text[start:end]
+        values = re.findall(r"`([a-zA-Z0-9_-]+)`", section)
+        if values:
+            return _dedupe(values)
+    return []
+
+
+def _extract_via_heading(text: str, field_name: str) -> list[str]:
+    headings = list(_HEADING_RE.finditer(text))
     for i, h in enumerate(headings):
         level, title = len(h.group(1)), h.group(2).lower()
         if field_name not in title:
@@ -536,9 +590,5 @@ def _extract_enum_values(text: str, field_name: str) -> list[str]:
         section = text[start:end]
         values = re.findall(r"`([a-zA-Z0-9_-]+)`", section)
         if values:
-            # de-duplicate, preserve order
-            seen: dict[str, None] = {}
-            for v in values:
-                seen.setdefault(v, None)
-            return list(seen.keys())
+            return _dedupe(values)
     return []

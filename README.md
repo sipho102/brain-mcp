@@ -9,24 +9,35 @@ other MCP clients.
 Full behavioural spec: see `brain-mcp-spec.md` in this repo (or wherever you
 keep it) if you need the "why" behind a design choice.
 
-## Before you deploy: confirm the CONVENTIONS.md parser
+## Notes on this vault's actual CONVENTIONS.md
 
-`brain_structure()` reads the `type`/`status`/`domain` enums live out of your
-vault's `90-meta/CONVENTIONS.md` rather than hardcoding them (see
-`_extract_enum_values` in `src/brain_mcp/vault.py`). I did not have access to
-your actual `CONVENTIONS.md` while building this, so the parser uses a
-heuristic: it finds a heading whose text contains the field name (`type`,
-`status`, or `domain` — case-insensitive, e.g. `### \`type\`` or `## Valid
-types`), then collects every `` `backtick-quoted` `` token up to the next
-heading of the same or higher level.
+`brain_structure()` reads the `type`/`status`/`domain` enums live out of
+`90-meta/CONVENTIONS.md` rather than hardcoding them (see
+`_extract_enum_values` in `src/brain_mcp/vault.py`). It's been checked
+against `personal_jon`'s real file directly: that file states the three
+enums as bold inline labels under one `## Enums` heading (`**type:**
+\`note\`, \`project\`, ...`) rather than each getting its own subheading, so
+`_extract_enum_values` tries that shape first (bounded to the label's own
+paragraph, so it doesn't pick up unrelated backtick-quoted words in the
+prose below — e.g. "`domain` is the primary query axis..."), falling back
+to a heading-based heuristic for vaults that document enums differently. If
+you restructure `CONVENTIONS.md`'s Enums section later, re-check this
+parser — the server fails loudly at startup rather than falling back to bad
+defaults if it can't parse a non-empty value list for all three fields.
 
-**Before running this against the real vault**, check that heuristic against
-your actual file (`tests/conftest.py`'s `CONVENTIONS_TEXT` fixture shows the
-shape it expects). If your conventions doc formats enums differently (a
-table, a fenced YAML block, etc.), update `_extract_enum_values` to match —
-the server fails loudly at startup if it can't parse a non-empty value list
-for all three fields, so you'll know immediately if it's wrong; it won't
-silently fall back to bad defaults.
+**`uid` format:** `personal_jon`'s `CONVENTIONS.md` currently contradicts
+itself here — the frontmatter example shows a UUIDv4, the prose two lines
+below it says the real format is `YYYYMMDD-HHmm` (+ a letter on same-minute
+collisions), and the actual notes in the vault use three different schemes
+between them (a UUIDv4 in one inbox note, `00000000-000N` sentinels in the
+meta docs, `YYYYMMDD-000N` sequential counters in the two `_index.md`
+files). `capture()` generates UUIDv4, confirmed — that's what the spec
+brief asked for, matches the current code, and keeps the `read_note`
+short-prefix lookup (≥8 chars) meaningful, which it wouldn't be against a
+low-entropy date-based id where everything from the same day shares a
+prefix. Worth reconciling `CONVENTIONS.md` itself at some point since it
+disagrees with what's actually on disk, but that's a vault content edit,
+not something this server does.
 
 ## Requirements
 

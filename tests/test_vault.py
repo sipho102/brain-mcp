@@ -68,6 +68,46 @@ def test_conventions_text_is_full_file(vault: VaultIndex):
     assert "Vault conventions" in vault.conventions_text
 
 
+def test_enums_parsed_from_bold_label_format():
+    # Mirrors the real vault's actual CONVENTIONS.md shape: all three enums
+    # live under one "## Enums" heading, distinguished by a bold inline
+    # label rather than their own subheading, with bulleted explanations
+    # (redundant backticks) below and prose after that incidentally
+    # backtick-quotes an unrelated word ("`domain` is the primary...").
+    from brain_mcp.vault import _extract_enum_values
+
+    text = """\
+## Enums
+
+**type:** `note`, `project`, `area`, `resource`, `runbook`, `decision`,
+`meeting`, `source`
+
+- `note` — general atomic note, the default
+- `project` / `area` — reserved for `_index.md` files
+
+**status:** `inbox`, `active`, `paused`, `done`, `archived`
+
+- `inbox` — captured but not yet triaged.
+
+**domain:** `inventx`, `homelab`, `gaming`, `personal`, `finance`, `home`
+
+`domain` is the primary query axis. It matters more than PARA placement.
+
+## Linking
+
+Use Obsidian wikilinks.
+"""
+    assert _extract_enum_values(text, "type") == [
+        "note", "project", "area", "resource", "runbook", "decision", "meeting", "source",
+    ]
+    assert _extract_enum_values(text, "status") == ["inbox", "active", "paused", "done", "archived"]
+    # The stray `domain` backtick in the prose paragraph below the list must
+    # not leak into the parsed enum values.
+    assert _extract_enum_values(text, "domain") == [
+        "inventx", "homelab", "gaming", "personal", "finance", "home",
+    ]
+
+
 def test_missing_conventions_file_fails_loudly(tmp_path: Path):
     from brain_mcp.vault import VaultError
 
