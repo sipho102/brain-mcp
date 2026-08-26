@@ -107,12 +107,49 @@ This is intentional and load-bearing — even a bug in the write path can't
 touch anything outside the inbox, regardless of what the Python code thinks
 it's doing. Don't simplify it to a single read-write mount.
 
+### Installing as an Unraid app instead
+
+If you'd rather manage this from Unraid's Docker tab like any other app —
+a form instead of editing `.env`, a Start/Stop/Update button afterward —
+there's a template for that in `unraid/brain-mcp.xml`. It runs an already
+-built image; Unraid's "Add Container" can't build from a Dockerfile the
+way `docker compose build` can, so build once first:
+
+```bash
+git clone git@github.com:sipho102/brain-mcp.git
+cd brain-mcp
+docker compose build
+```
+
+Then make the template available to Unraid — either:
+
+- Copy it into Unraid's local templates folder:
+  ```bash
+  cp unraid/brain-mcp.xml /boot/config/plugins/dockerMan/templates-user/
+  ```
+  It'll then show up under **Docker → Add Container → template
+  dropdown**.
+- Or, in the Docker tab, **Add Container** and paste this repo's raw
+  template URL directly into the template field (works without SSHing in
+  at all, but still requires the image already built as above):
+  `https://raw.githubusercontent.com/sipho102/brain-mcp/main/unraid/brain-mcp.xml`
+
+Either way, you'll get a form for the vault path, the inbox path (must be
+`<vault path>/00-inbox` — the template can't derive it for you), instance
+name, and bearer token; everything else is pre-filled with sane defaults
+under "advanced view". Rebuilding after a `git pull` (`docker compose
+build`) and clicking **Update** in the Docker tab is how you pick up
+future changes to this repo.
+
 ### Serving a second vault
 
 One container serves one vault — there's deliberately no multi-vault
-service list in `docker-compose.yml`. To add a sibling vault, copy this
-deployment directory (or just `docker-compose.yml` + `.env`) elsewhere,
-fill in that copy's `.env` with a different `BRAIN_NAME`,
+service list in `docker-compose.yml`, and no multi-vault form in the
+Unraid template either. On the Unraid-app path above, that just means
+running **Add Container** again from the same template with a different
+name/paths/token/port. On the Compose path, copy this deployment directory
+(or just `docker-compose.yml` + `.env`) elsewhere, fill in that copy's
+`.env` with a different `BRAIN_NAME`,
 `BRAIN_VAULT_PATH`, `BRAIN_TOKEN`, and `PORT`, and run `docker compose up
 -d --build` from there too. Same image (`brain-mcp:latest`), independent
 containers.

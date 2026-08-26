@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>brain-mcp</Name>
+  <Repository>brain-mcp:latest</Repository>
+  <Registry/>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/sipho102/brain-mcp</Support>
+  <Project>https://github.com/sipho102/brain-mcp</Project>
+  <Overview>MCP server exposing a markdown, PARA-structured Obsidian vault as read tools plus a single constrained write tool (capture, which only ever creates new notes in 00-inbox/). One container serves exactly one vault - for a second vault, build the image once, then add this template again with a different name/token/paths/port. Image must be built locally first: clone the repo and run "docker compose build" (see README) before adding this container - Unraid's Add Container only runs an existing image, it doesn't build from a Dockerfile.</Overview>
+  <Category>Productivity: Tools:</Category>
+  <WebUI>http://[IP]:[PORT:3100]/health</WebUI>
+  <TemplateURL/>
+  <Icon/>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="MCP Port" Target="3100" Default="3100" Mode="tcp" Description="Host port to reach the server on. The container always listens on 3100 internally, so this is the only port value you need to change if running a second instance." Type="Port" Display="always" Required="true" Mask="false">3100</Config>
+  <Config Name="Vault (read-only)" Target="/vault" Default="" Mode="ro" Description="Host path to the vault's root folder. Mounted read-only." Type="Path" Display="always" Required="true" Mask="false"></Config>
+  <Config Name="Inbox (read-write)" Target="/vault/00-inbox" Default="" Mode="rw" Description="Host path to this SAME vault's 00-inbox folder - must be exactly the Vault path above plus /00-inbox. This is the only writable mount; it's what keeps capture() from being able to touch anything else in the vault even if the code had a bug." Type="Path" Display="always" Required="true" Mask="false"></Config>
+  <Config Name="Instance name" Target="BRAIN_NAME" Default="" Mode="" Description="Identifies this vault in server logs and to MCP clients, e.g. personal or family." Type="Variable" Display="always" Required="true" Mask="false"></Config>
+  <Config Name="Bearer token" Target="BRAIN_TOKEN" Default="" Mode="" Description="Required on every MCP request from a client. Generate one with: openssl rand -hex 32" Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="Log level" Target="LOG_LEVEL" Default="INFO" Mode="" Description="DEBUG, INFO, WARNING, ERROR, or CRITICAL." Type="Variable" Display="advanced" Required="false" Mask="false">INFO</Config>
+  <Config Name="BRAIN_ROOT" Target="BRAIN_ROOT" Default="/vault" Mode="" Description="In-container vault path. Must match the Vault mount's container path above - leave as /vault." Type="Variable" Display="advanced" Required="true" Mask="false">/vault</Config>
+  <Config Name="PORT" Target="PORT" Default="3100" Mode="" Description="In-container listen port. Must match the MCP Port mapping's container-side value above - leave as 3100." Type="Variable" Display="advanced" Required="true" Mask="false">3100</Config>
+</Container>
