@@ -479,7 +479,11 @@ class VaultIndex:
                 if rel.endswith(".md"):
                     changed_rel.add(rel)
             if changed_rel:
-                logger.info("Reindexing %d changed file(s)", len(changed_rel))
+                logger.info(
+                    "Reindexing %d changed file(s): %s",
+                    len(changed_rel),
+                    ", ".join(sorted(changed_rel)),
+                )
                 self.reindex_paths(changed_rel)
 
     def reindex_paths(self, rel_paths: set[str]) -> None:
