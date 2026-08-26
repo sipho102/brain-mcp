@@ -13,7 +13,7 @@ services:
     environment:
       BRAIN_ROOT: /vault
       BRAIN_NAME: personal_jon
-      BRAIN_TOKEN: ${BRAIN_TOKEN_JON}
+      BRAIN_TOKEN: ${BRAIN_TOKEN}
       PORT: "3100"
     volumes:
       # Read-only vault mount, with a narrower read-write mount nested on
@@ -31,7 +31,9 @@ services:
 
   # Second instance for a sibling vault. Same image, different env vars and
   # mounts, proving the multi-instance design: nothing about personal_jon is
-  # hardcoded anywhere in the image.
+  # hardcoded anywhere in the image. Its token needs its own env var name
+  # (BRAIN_TOKEN_JASMIN, not BRAIN_TOKEN) since it lives in the same .env as
+  # the personal_jon service above and compose reads that file once for both.
   #
   # brain-mcp-jasmin:
   #   build:

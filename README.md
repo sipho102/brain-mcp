@@ -63,7 +63,7 @@ of sibling vaults as separate containers.
 | `BIND_ADDRESS` | no       | `0.0.0.0` | Listen address                                 |
 | `LOG_LEVEL`    | no       | `INFO`    | `DEBUG`/`INFO`/`WARNING`/`ERROR`/`CRITICAL`    |
 
-Copy `.env.example` to `.env` and fill in `BRAIN_TOKEN_JON` (a random
+Copy `.env.example` to `.env` and fill in `BRAIN_TOKEN` (a random
 secret — `openssl rand -hex 32` works well) before running Compose.
 
 ## Local development
@@ -88,7 +88,7 @@ uv run brain-mcp
 ## Running on Unraid
 
 ```bash
-cp .env.example .env   # fill in BRAIN_TOKEN_JON
+cp .env.example .env   # fill in BRAIN_TOKEN
 docker compose up -d --build
 curl http://<unraid-host>:3100/health
 ```
