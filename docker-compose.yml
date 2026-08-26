@@ -1,0 +1,60 @@
+services:
+  brain-mcp-jon:
+    build:
+      context: .
+      args:
+        APP_UID: ${BRAIN_UID:-99}
+        APP_GID: ${BRAIN_GID:-100}
+    image: brain-mcp:latest
+    container_name: brain-mcp-jon
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    environment:
+      BRAIN_ROOT: /vault
+      BRAIN_NAME: personal_jon
+      BRAIN_TOKEN: ${BRAIN_TOKEN_JON}
+      PORT: "3100"
+    volumes:
+      # Read-only vault mount, with a narrower read-write mount nested on
+      # top for just the inbox. This is load-bearing: even a bug in the
+      # write path cannot touch anything outside 00-inbox/. Do not collapse
+      # this into a single read-write mount.
+      - /mnt/user/brain/personal_jon:/vault:ro
+      - /mnt/user/brain/personal_jon/00-inbox:/vault/00-inbox:rw
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3100/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  # Second instance for a sibling vault. Same image, different env vars and
+  # mounts, proving the multi-instance design: nothing about personal_jon is
+  # hardcoded anywhere in the image.
+  #
+  # brain-mcp-jasmin:
+  #   build:
+  #     context: .
+  #     args:
+  #       APP_UID: ${BRAIN_UID:-99}
+  #       APP_GID: ${BRAIN_GID:-100}
+  #   image: brain-mcp:latest
+  #   container_name: brain-mcp-jasmin
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3101:3101"
+  #   environment:
+  #     BRAIN_ROOT: /vault
+  #     BRAIN_NAME: personal_jasmin
+  #     BRAIN_TOKEN: ${BRAIN_TOKEN_JASMIN}
+  #     PORT: "3101"
+  #   volumes:
+  #     - /mnt/user/brain/personal_jasmin:/vault:ro
+  #     - /mnt/user/brain/personal_jasmin/00-inbox:/vault/00-inbox:rw
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3101/health"]
+  #     interval: 30s
+  #     timeout: 5s
+  #     start_period: 10s
+  #     retries: 3
