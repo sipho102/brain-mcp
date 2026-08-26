@@ -7,6 +7,7 @@ import contextlib
 import hmac
 import logging
 from typing import Any
+from urllib.parse import parse_qsl
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
@@ -205,7 +206,13 @@ def build_mcp_server(config: Config, vault: VaultIndex) -> FastMCP:
 
 class BearerAuthASGIMiddleware:
     """Raw ASGI middleware: constant-time bearer check on every request
-    except the exempt paths (health check). Never logs the token."""
+    except the exempt paths (health check). Never logs the token.
+
+    Accepts the token either as a standard `Authorization: Bearer <token>`
+    header or as a `?token=<token>` query parameter, for clients that can't
+    set custom headers on a remote MCP server (URL-only config forms). The
+    header is checked first; the query parameter is a fallback for when a
+    client offers no way to send one."""
 
     def __init__(self, app, token: str, exempt_paths: set[str]):
         self.app = app
@@ -217,23 +224,34 @@ class BearerAuthASGIMiddleware:
             await self.app(scope, receive, send)
             return
 
-        headers = dict(scope.get("headers") or [])
-        auth_header = headers.get(b"authorization", b"").decode("latin-1")
         client = scope.get("client")
         source_ip = client[0] if client else "unknown"
+        supplied = self._extract_token(scope)
 
-        if not auth_header.startswith("Bearer "):
-            logger.warning("auth rejected: missing/malformed Authorization header from %s", source_ip)
+        if supplied is None:
+            logger.warning("auth rejected: no token supplied from %s", source_ip)
             await self._reject(send)
             return
 
-        supplied = auth_header[len("Bearer ") :]
         if not hmac.compare_digest(supplied, self.token):
             logger.warning("auth rejected: invalid token from %s", source_ip)
             await self._reject(send)
             return
 
         await self.app(scope, receive, send)
+
+    @staticmethod
+    def _extract_token(scope) -> str | None:
+        headers = dict(scope.get("headers") or [])
+        auth_header = headers.get(b"authorization", b"").decode("latin-1")
+        if auth_header.startswith("Bearer "):
+            return auth_header[len("Bearer ") :]
+
+        query_string = (scope.get("query_string") or b"").decode("latin-1")
+        for key, value in parse_qsl(query_string):
+            if key == "token":
+                return value
+        return None
 
     @staticmethod
     async def _reject(send):

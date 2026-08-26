@@ -218,6 +218,24 @@ ignore a static bearer token unless you disable that explicitly:
 Without `oauth: false`, opencode will try (and fail) an OAuth handshake
 instead of using the header.
 
+### Clients with no header field at all
+
+Some MCP-client UIs only take a name, transport, and URL — no way to set a
+custom `Authorization` header. For those, put the token in the URL instead:
+
+```
+http://<unraid-host>:3100/mcp?token=<token>
+```
+
+The server checks the `Authorization` header first and falls back to a
+`?token=` query parameter, so this works anywhere the header-based config
+above does too. Worth knowing before you rely on it: a token in a URL can
+end up in more places than a header would — the client's saved config, a
+browser's history if the URL is ever opened directly, shell history if
+you've pasted it into a terminal. Access logs aren't a concern here
+(`uvicorn`'s access log is off), but treat the URL itself as carrying the
+secret, the same as you would the token itself.
+
 ## Tools
 
 Six tools, kept deliberately small (tool schemas cost client context):

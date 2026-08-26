@@ -81,7 +81,10 @@ machinery is OAuth-resource-server shaped (issuer URLs, scopes,
 token cleanly. `BearerAuthASGIMiddleware` in `server.py` does a
 constant-time comparison itself, passes non-`"http"` scope types (notably
 `"lifespan"`) straight through untouched so the inner app's own startup/
-shutdown still fires, and exempts `/health` by path. DNS-rebinding
+shutdown still fires, and exempts `/health` by path. The token is accepted
+either as a standard `Authorization: Bearer` header or, as a fallback via
+`_extract_token`, a `?token=` query parameter — added for MCP-client UIs
+that only take a URL with no custom-header field. DNS-rebinding
 host-header protection is explicitly disabled in the `FastMCP(...)`
 constructor (`transport_security=TransportSecuritySettings(
 enable_dns_rebinding_protection=False)`) since this server is reached over

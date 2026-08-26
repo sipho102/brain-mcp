@@ -175,6 +175,38 @@ async def test_mcp_endpoint_rejects_wrong_token(vault: VaultIndex, vault_root: P
     assert resp.status_code == 401
 
 
+async def test_mcp_endpoint_rejects_wrong_token_in_query(vault: VaultIndex, vault_root: Path):
+    app = build_app(_config(vault_root), vault)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        resp = await client.post(
+            "/mcp?token=wrong-token",
+            json={"jsonrpc": "2.0", "method": "initialize", "id": 1},
+        )
+    assert resp.status_code == 401
+
+
+async def test_mcp_initialize_handshake_with_token_in_query_param(vault: VaultIndex, vault_root: Path):
+    # For clients (e.g. some MCP-client GUIs) that only take a URL and can't
+    # set a custom Authorization header.
+    app = build_app(_config(vault_root), vault)
+
+    def factory(headers=None, timeout=None, auth=None):
+        kwargs = {"follow_redirects": True, "transport": httpx.ASGITransport(app=app), "base_url": "http://testserver"}
+        if headers:
+            kwargs["headers"] = headers
+        return httpx.AsyncClient(**kwargs)
+
+    async with _LifespanManager(app):
+        async with streamablehttp_client(
+            "http://testserver/mcp?token=test-token",
+            httpx_client_factory=factory,
+        ) as (read, write, _get_session_id):
+            async with ClientSession(read, write) as session:
+                result = await session.initialize()
+                assert result.serverInfo.name.startswith("brain-mcp")
+
+
 async def test_mcp_initialize_handshake_with_correct_token(vault: VaultIndex, vault_root: Path):
     app = build_app(_config(vault_root), vault)
 
