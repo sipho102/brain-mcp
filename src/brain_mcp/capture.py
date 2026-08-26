@@ -117,6 +117,13 @@ def _write_atomic(target: Path, text: str) -> None:
             f.write(text)
             f.flush()
             os.fsync(f.fileno())
+        # Group-writable regardless of the container's umask: the container
+        # runs as a fixed UID (99 by default, Unraid's nobody), but whatever
+        # else edits the vault - Obsidian synced over SMB, another process -
+        # is very unlikely to be that exact UID. It just needs to share the
+        # GID (100, Unraid's users) to edit notes capture() has written,
+        # which requires the group bit to actually include write.
+        os.chmod(tmp_path, 0o664)
         os.replace(tmp_path, target)
     finally:
         if tmp_path.exists():

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import stat
 from pathlib import Path
 
 import frontmatter
@@ -42,6 +43,18 @@ def test_capture_creates_note_in_inbox(vault: VaultIndex, vault_root: Path):
     assert "conversation with Claude" in post.content
     assert "## Related" in post.content
     assert "[[Homelab]]" in post.content
+
+
+def test_capture_writes_group_writable_file(vault: VaultIndex, vault_root: Path):
+    # The container runs as a fixed UID (99 by default); anything else that
+    # edits the vault (Obsidian synced over SMB, etc.) almost certainly
+    # isn't that same UID, so captured notes must be group-writable or
+    # editing them elsewhere fails with EACCES.
+    result = capture_mod.capture_note(
+        vault, title="Permission Check", body="body", domain=None, tags=None, source=None, links=None
+    )
+    mode = stat.S_IMODE((vault_root / result["path"]).stat().st_mode)
+    assert mode == 0o664
 
 
 def test_capture_default_domain_is_personal(vault: VaultIndex):
