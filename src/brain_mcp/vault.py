@@ -33,7 +33,7 @@ EXCLUDED_DIR_PREFIXES: tuple[str, ...] = (
 )
 
 # PARA folder map: keyword -> (directory prefix, human description).
-# Descriptions match personal_jon's 90-meta/CONVENTIONS.md wording.
+# Descriptions match the reference vault's 90-meta/CONVENTIONS.md wording.
 PARA_FOLDERS: dict[str, tuple[str, str]] = {
     "inbox": ("00-inbox", "Unprocessed capture. Nothing stays here permanently."),
     "projects": ("10-projects", "Has a defined outcome and an end. One folder per project."),

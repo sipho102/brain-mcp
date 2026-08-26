@@ -1,59 +1,60 @@
 services:
-  brain-mcp-jon:
+  brain-mcp:
     build:
       context: .
       args:
         APP_UID: ${BRAIN_UID:-99}
         APP_GID: ${BRAIN_GID:-100}
     image: brain-mcp:latest
-    container_name: brain-mcp-jon
+    container_name: brain-mcp
     restart: unless-stopped
     ports:
-      - "3100:3100"
+      - "${PORT:-3100}:${PORT:-3100}"
     environment:
       BRAIN_ROOT: /vault
-      BRAIN_NAME: personal_jon
+      BRAIN_NAME: ${BRAIN_NAME}
       BRAIN_TOKEN: ${BRAIN_TOKEN}
-      PORT: "3100"
+      PORT: "${PORT:-3100}"
     volumes:
       # Read-only vault mount, with a narrower read-write mount nested on
       # top for just the inbox. This is load-bearing: even a bug in the
       # write path cannot touch anything outside 00-inbox/. Do not collapse
       # this into a single read-write mount.
-      - /mnt/user/brain/personal_jon:/vault:ro
-      - /mnt/user/brain/personal_jon/00-inbox:/vault/00-inbox:rw
+      - ${BRAIN_VAULT_PATH}:/vault:ro
+      - ${BRAIN_VAULT_PATH}/00-inbox:/vault/00-inbox:rw
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3100/health"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:${PORT:-3100}/health"]
       interval: 30s
       timeout: 5s
       start_period: 10s
       retries: 3
 
-  # Second instance for a sibling vault. Same image, different env vars and
-  # mounts, proving the multi-instance design: nothing about personal_jon is
-  # hardcoded anywhere in the image. Its token needs its own env var name
-  # (BRAIN_TOKEN_JASMIN, not BRAIN_TOKEN) since it lives in the same .env as
-  # the personal_jon service above and compose reads that file once for both.
+  # Template for a second, sibling vault instance — same image, different
+  # name/token/mount/port — proving the multi-instance design: nothing
+  # about a specific vault is hardcoded anywhere in the image. Copy this
+  # block, give it a real service name, and set its own env vars (its
+  # token needs its own var name, e.g. BRAIN_TOKEN_2, since it reads the
+  # same .env file as the service above).
   #
-  # brain-mcp-jasmin:
+  # brain-mcp-2:
   #   build:
   #     context: .
   #     args:
   #       APP_UID: ${BRAIN_UID:-99}
   #       APP_GID: ${BRAIN_GID:-100}
   #   image: brain-mcp:latest
-  #   container_name: brain-mcp-jasmin
+  #   container_name: brain-mcp-2
   #   restart: unless-stopped
   #   ports:
   #     - "3101:3101"
   #   environment:
   #     BRAIN_ROOT: /vault
-  #     BRAIN_NAME: personal_jasmin
-  #     BRAIN_TOKEN: ${BRAIN_TOKEN_JASMIN}
+  #     BRAIN_NAME: ${BRAIN_NAME_2}
+  #     BRAIN_TOKEN: ${BRAIN_TOKEN_2}
   #     PORT: "3101"
   #   volumes:
-  #     - /mnt/user/brain/personal_jasmin:/vault:ro
-  #     - /mnt/user/brain/personal_jasmin/00-inbox:/vault/00-inbox:rw
+  #     - ${BRAIN_VAULT_PATH_2}:/vault:ro
+  #     - ${BRAIN_VAULT_PATH_2}/00-inbox:/vault/00-inbox:rw
   #   healthcheck:
   #     test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3101/health"]
   #     interval: 30s

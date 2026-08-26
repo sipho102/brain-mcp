@@ -9,14 +9,14 @@ other MCP clients.
 Full behavioural spec: see `brain-mcp-spec.md` in this repo (or wherever you
 keep it) if you need the "why" behind a design choice.
 
-## Notes on this vault's actual CONVENTIONS.md
+## Notes on the CONVENTIONS.md parser
 
 `brain_structure()` reads the `type`/`status`/`domain` enums live out of
-`90-meta/CONVENTIONS.md` rather than hardcoding them (see
+your vault's `90-meta/CONVENTIONS.md` rather than hardcoding them (see
 `_extract_enum_values` in `src/brain_mcp/vault.py`). It's been checked
-against `personal_jon`'s real file directly: that file states the three
-enums as bold inline labels under one `## Enums` heading (`**type:**
-\`note\`, \`project\`, ...`) rather than each getting its own subheading, so
+against a real vault's file directly: that file states the three enums as
+bold inline labels under one `## Enums` heading (`**type:** \`note\`,
+\`project\`, ...`) rather than each getting its own subheading, so
 `_extract_enum_values` tries that shape first (bounded to the label's own
 paragraph, so it doesn't pick up unrelated backtick-quoted words in the
 prose below — e.g. "`domain` is the primary query axis..."), falling back
@@ -25,19 +25,19 @@ you restructure `CONVENTIONS.md`'s Enums section later, re-check this
 parser — the server fails loudly at startup rather than falling back to bad
 defaults if it can't parse a non-empty value list for all three fields.
 
-**`uid` format:** `personal_jon`'s `CONVENTIONS.md` currently contradicts
-itself here — the frontmatter example shows a UUIDv4, the prose two lines
-below it says the real format is `YYYYMMDD-HHmm` (+ a letter on same-minute
-collisions), and the actual notes in the vault use three different schemes
-between them (a UUIDv4 in one inbox note, `00000000-000N` sentinels in the
-meta docs, `YYYYMMDD-000N` sequential counters in the two `_index.md`
-files). `capture()` generates UUIDv4, confirmed — that's what the spec
-brief asked for, matches the current code, and keeps the `read_note`
-short-prefix lookup (≥8 chars) meaningful, which it wouldn't be against a
-low-entropy date-based id where everything from the same day shares a
-prefix. Worth reconciling `CONVENTIONS.md` itself at some point since it
-disagrees with what's actually on disk, but that's a vault content edit,
-not something this server does.
+**`uid` format:** the vault this was validated against currently has a
+self-contradiction in its own `CONVENTIONS.md` — the frontmatter example
+shows a UUIDv4, the prose two lines below it says the real format is
+`YYYYMMDD-HHmm` (+ a letter on same-minute collisions), and the actual
+notes on disk use three different schemes between them (a UUIDv4 in one
+inbox note, `00000000-000N` sentinels in the meta docs, `YYYYMMDD-000N`
+sequential counters in the `_index.md` files). `capture()` generates
+UUIDv4 — that's what the original spec asked for, matches the current
+code, and keeps the `read_note` short-prefix lookup (≥8 chars) meaningful,
+which it wouldn't be against a low-entropy date-based id where everything
+from the same day shares a prefix. If your own `CONVENTIONS.md` documents
+a different `uid` scheme, that's worth reconciling on the vault side —
+not something this server does automatically.
 
 ## Requirements
 
@@ -57,14 +57,15 @@ of sibling vaults as separate containers.
 | Variable       | Required | Default   | Meaning                                      |
 |----------------|----------|-----------|-----------------------------------------------|
 | `BRAIN_ROOT`   | yes      | —         | Absolute path to the vault root in-container   |
-| `BRAIN_NAME`   | yes      | —         | Instance name, e.g. `personal_jon`             |
+| `BRAIN_NAME`   | yes      | —         | Instance name, e.g. `personal` or `family`     |
 | `BRAIN_TOKEN`  | yes      | —         | Bearer token required on every MCP request     |
 | `PORT`         | no       | `3100`    | Listen port                                    |
 | `BIND_ADDRESS` | no       | `0.0.0.0` | Listen address                                 |
 | `LOG_LEVEL`    | no       | `INFO`    | `DEBUG`/`INFO`/`WARNING`/`ERROR`/`CRITICAL`    |
 
-Copy `.env.example` to `.env` and fill in `BRAIN_TOKEN` (a random
-secret — `openssl rand -hex 32` works well) before running Compose.
+Copy `.env.example` to `.env` and fill in `BRAIN_NAME`, `BRAIN_VAULT_PATH`
+(the host path to your vault), and `BRAIN_TOKEN` (a random secret —
+`openssl rand -hex 32` works well) before running Compose.
 
 ## Local development
 
@@ -80,7 +81,7 @@ To run the server locally against a real (or scratch) vault directory:
 
 ```bash
 export BRAIN_ROOT=/path/to/vault
-export BRAIN_NAME=personal_jon
+export BRAIN_NAME=personal
 export BRAIN_TOKEN=dev-token
 uv run brain-mcp
 ```
@@ -88,29 +89,31 @@ uv run brain-mcp
 ## Running on Unraid
 
 ```bash
-cp .env.example .env   # fill in BRAIN_TOKEN
+cp .env.example .env   # fill in BRAIN_NAME, BRAIN_VAULT_PATH, BRAIN_TOKEN
 docker compose up -d --build
 curl http://<unraid-host>:3100/health
 ```
 
-The compose file mounts the vault read-only and re-mounts just `00-inbox/`
-read-write on top of it:
+The compose file mounts `BRAIN_VAULT_PATH` read-only and re-mounts just
+`00-inbox/` read-write on top of it:
 
 ```yaml
 volumes:
-  - /mnt/user/brain/personal_jon:/vault:ro
-  - /mnt/user/brain/personal_jon/00-inbox:/vault/00-inbox:rw
+  - ${BRAIN_VAULT_PATH}:/vault:ro
+  - ${BRAIN_VAULT_PATH}/00-inbox:/vault/00-inbox:rw
 ```
 
 This is intentional and load-bearing — even a bug in the write path can't
 touch anything outside the inbox, regardless of what the Python code thinks
 it's doing. Don't simplify it to a single read-write mount.
 
-### Adding a sibling vault (e.g. `personal_jasmin`)
+### Adding a sibling vault
 
-`docker-compose.yml` has a commented-out `brain-mcp-jasmin` service block on
-port 3101 as a template. Uncomment it, set `BRAIN_TOKEN_JASMIN` in `.env`,
-and point its volumes at the sibling vault's path.
+`docker-compose.yml` has a commented-out `brain-mcp-2` service block on
+port 3101 as a template. Copy it, give it a real service name, set
+`BRAIN_NAME_2`/`BRAIN_VAULT_PATH_2`/`BRAIN_TOKEN_2` in `.env` (a second
+service reading the same `.env` file needs its own var names), and point
+its volumes at the sibling vault's path.
 
 ### Container user / permissions
 
