@@ -1,5 +1,10 @@
 # brain-mcp
 
+<img src="unraid/icon.png" width="120" alt="brain-mcp icon" />
+
+*Icon design credit: [wenmeiZhou](https://www.istockphoto.com/portfolio/wenmeiZhou?mediatype=illustration)
+on iStock.*
+
 An MCP server that exposes a markdown, PARA-structured second-brain vault
 (Obsidian-compatible) as a set of read tools plus a single constrained write
 tool (`capture`, which only ever creates new notes in `00-inbox/`). Runs as a
