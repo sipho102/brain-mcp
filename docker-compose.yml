@@ -6,7 +6,7 @@ services:
         APP_UID: ${BRAIN_UID:-99}
         APP_GID: ${BRAIN_GID:-100}
     image: brain-mcp:latest
-    container_name: brain-mcp
+    container_name: brain-mcp-${BRAIN_NAME}
     restart: unless-stopped
     ports:
       - "${PORT:-3100}:${PORT:-3100}"
@@ -28,36 +28,3 @@ services:
       timeout: 5s
       start_period: 10s
       retries: 3
-
-  # Template for a second, sibling vault instance — same image, different
-  # name/token/mount/port — proving the multi-instance design: nothing
-  # about a specific vault is hardcoded anywhere in the image. Copy this
-  # block, give it a real service name, and set its own env vars (its
-  # token needs its own var name, e.g. BRAIN_TOKEN_2, since it reads the
-  # same .env file as the service above).
-  #
-  # brain-mcp-2:
-  #   build:
-  #     context: .
-  #     args:
-  #       APP_UID: ${BRAIN_UID:-99}
-  #       APP_GID: ${BRAIN_GID:-100}
-  #   image: brain-mcp:latest
-  #   container_name: brain-mcp-2
-  #   restart: unless-stopped
-  #   ports:
-  #     - "3101:3101"
-  #   environment:
-  #     BRAIN_ROOT: /vault
-  #     BRAIN_NAME: ${BRAIN_NAME_2}
-  #     BRAIN_TOKEN: ${BRAIN_TOKEN_2}
-  #     PORT: "3101"
-  #   volumes:
-  #     - ${BRAIN_VAULT_PATH_2}:/vault:ro
-  #     - ${BRAIN_VAULT_PATH_2}/00-inbox:/vault/00-inbox:rw
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3101/health"]
-  #     interval: 30s
-  #     timeout: 5s
-  #     start_period: 10s
-  #     retries: 3

@@ -107,13 +107,15 @@ This is intentional and load-bearing — even a bug in the write path can't
 touch anything outside the inbox, regardless of what the Python code thinks
 it's doing. Don't simplify it to a single read-write mount.
 
-### Adding a sibling vault
+### Serving a second vault
 
-`docker-compose.yml` has a commented-out `brain-mcp-2` service block on
-port 3101 as a template. Copy it, give it a real service name, set
-`BRAIN_NAME_2`/`BRAIN_VAULT_PATH_2`/`BRAIN_TOKEN_2` in `.env` (a second
-service reading the same `.env` file needs its own var names), and point
-its volumes at the sibling vault's path.
+One container serves one vault — there's deliberately no multi-vault
+service list in `docker-compose.yml`. To add a sibling vault, copy this
+deployment directory (or just `docker-compose.yml` + `.env`) elsewhere,
+fill in that copy's `.env` with a different `BRAIN_NAME`,
+`BRAIN_VAULT_PATH`, `BRAIN_TOKEN`, and `PORT`, and run `docker compose up
+-d --build` from there too. Same image (`brain-mcp:latest`), independent
+containers.
 
 ### Container user / permissions
 
