@@ -90,9 +90,13 @@ uv run brain-mcp
 
 ```bash
 cp .env.example .env   # fill in BRAIN_NAME, BRAIN_VAULT_PATH, BRAIN_TOKEN
-docker compose up -d --build
+docker compose up -d --build   # or: docker compose pull && docker compose up -d
 curl http://<unraid-host>:3100/health
 ```
+
+`--build` builds from this checkout; `pull` instead fetches the same
+image prebuilt from GHCR (see "Installing as an Unraid app" below) —
+either produces the `ghcr.io/sipho102/brain-mcp:latest` tag locally.
 
 The compose file mounts `BRAIN_VAULT_PATH` read-only and re-mounts just
 `00-inbox/` read-write on top of it:
@@ -111,35 +115,30 @@ it's doing. Don't simplify it to a single read-write mount.
 
 If you'd rather manage this from Unraid's Docker tab like any other app —
 a form instead of editing `.env`, a Start/Stop/Update button afterward —
-there's a template for that in `unraid/brain-mcp.xml`. It runs an already
--built image; Unraid's "Add Container" can't build from a Dockerfile the
-way `docker compose build` can, so build once first:
+there's a template for that in `unraid/brain-mcp.xml`. `.github/workflows/
+publish.yml` builds this repo's image and publishes it to GHCR
+(`ghcr.io/sipho102/brain-mcp:latest`) on every push to `main`, and the
+template pulls that directly — no cloning or building on the Unraid box
+at all.
 
-```bash
-git clone git@github.com:sipho102/brain-mcp.git
-cd brain-mcp
-docker compose build
-```
+Make the template available to Unraid — either:
 
-Then make the template available to Unraid — either:
-
-- Copy it into Unraid's local templates folder:
+- In the Docker tab, **Add Container** and paste this repo's raw template
+  URL directly into the template field:
+  `https://raw.githubusercontent.com/sipho102/brain-mcp/main/unraid/brain-mcp.xml`
+- Or copy it into Unraid's local templates folder over SSH:
   ```bash
-  cp unraid/brain-mcp.xml /boot/config/plugins/dockerMan/templates-user/
+  curl -o /boot/config/plugins/dockerMan/templates-user/brain-mcp.xml \
+    https://raw.githubusercontent.com/sipho102/brain-mcp/main/unraid/brain-mcp.xml
   ```
   It'll then show up under **Docker → Add Container → template
   dropdown**.
-- Or, in the Docker tab, **Add Container** and paste this repo's raw
-  template URL directly into the template field (works without SSHing in
-  at all, but still requires the image already built as above):
-  `https://raw.githubusercontent.com/sipho102/brain-mcp/main/unraid/brain-mcp.xml`
 
 Either way, you'll get a form for the vault path, the inbox path (must be
 `<vault path>/00-inbox` — the template can't derive it for you), instance
 name, and bearer token; everything else is pre-filled with sane defaults
-under "advanced view". Rebuilding after a `git pull` (`docker compose
-build`) and clicking **Update** in the Docker tab is how you pick up
-future changes to this repo.
+under "advanced view". Clicking **Update** in the Docker tab later pulls
+whatever's newest on `ghcr.io/sipho102/brain-mcp:latest`.
 
 ### Serving a second vault
 

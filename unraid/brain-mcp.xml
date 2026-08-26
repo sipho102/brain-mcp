@@ -1,15 +1,15 @@
 <?xml version="1.0"?>
 <Container version="2">
   <Name>brain-mcp</Name>
-  <Repository>brain-mcp:latest</Repository>
-  <Registry/>
+  <Repository>ghcr.io/sipho102/brain-mcp:latest</Repository>
+  <Registry>https://github.com/sipho102/brain-mcp/pkgs/container/brain-mcp</Registry>
   <Network>bridge</Network>
   <MyIP/>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
   <Support>https://github.com/sipho102/brain-mcp</Support>
   <Project>https://github.com/sipho102/brain-mcp</Project>
-  <Overview>MCP server exposing a markdown, PARA-structured Obsidian vault as read tools plus a single constrained write tool (capture, which only ever creates new notes in 00-inbox/). One container serves exactly one vault - for a second vault, build the image once, then add this template again with a different name/token/paths/port. Image must be built locally first: clone the repo and run "docker compose build" (see README) before adding this container - Unraid's Add Container only runs an existing image, it doesn't build from a Dockerfile.</Overview>
+  <Overview>MCP server exposing a markdown, PARA-structured Obsidian vault as read tools plus a single constrained write tool (capture, which only ever creates new notes in 00-inbox/). One container serves exactly one vault - for a second vault, add this template again with a different name/token/paths/port. Pulls the prebuilt image from GHCR, so there's nothing to clone or build first.</Overview>
   <Category>Productivity: Tools:</Category>
   <WebUI>http://[IP]:[PORT:3100]/health</WebUI>
   <TemplateURL/>

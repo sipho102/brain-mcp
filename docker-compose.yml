@@ -5,7 +5,10 @@ services:
       args:
         APP_UID: ${BRAIN_UID:-99}
         APP_GID: ${BRAIN_GID:-100}
-    image: brain-mcp:latest
+    # Published by .github/workflows/publish.yml on every push to main.
+    # `docker compose build` tags a local build with this same reference;
+    # `docker compose pull` (no build) fetches it from GHCR instead.
+    image: ghcr.io/sipho102/brain-mcp:latest
     container_name: brain-mcp-${BRAIN_NAME}
     restart: unless-stopped
     ports:
