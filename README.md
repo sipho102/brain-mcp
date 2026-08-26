@@ -121,24 +121,43 @@ publish.yml` builds this repo's image and publishes it to GHCR
 template pulls that directly — no cloning or building on the Unraid box
 at all.
 
-Make the template available to Unraid — either:
+Make the template available to Unraid:
 
-- In the Docker tab, **Add Container** and paste this repo's raw template
-  URL directly into the template field:
+- **Recommended** — in the Docker tab, **Add Container** and paste this
+  repo's raw template URL directly into the template field:
   `https://raw.githubusercontent.com/sipho102/brain-mcp/main/unraid/brain-mcp.xml`
-- Or copy it into Unraid's local templates folder over SSH:
+  Nothing gets written to Unraid's local templates folder this way, so
+  there's no stray file left behind to conflict with later — see the
+  caveat below on the alternative method.
+- Or copy it into Unraid's local templates folder over SSH first:
   ```bash
   curl -o /boot/config/plugins/dockerMan/templates-user/brain-mcp.xml \
     https://raw.githubusercontent.com/sipho102/brain-mcp/main/unraid/brain-mcp.xml
   ```
   It'll then show up under **Docker → Add Container → template
-  dropdown**.
+  dropdown** — but see the note right after Add Container about deleting
+  this file once the container exists.
 
 Either way, you'll get a form for the vault path, the inbox path (must be
 `<vault path>/00-inbox` — the template can't derive it for you), instance
 name, and bearer token; everything else is pre-filled with sane defaults
-under "advanced view". Clicking **Update** in the Docker tab later pulls
-whatever's newest on `ghcr.io/sipho102/brain-mcp:latest`.
+under "advanced view".
+
+**If you used the local-copy method above, delete that seed file once the
+container's been added:**
+```bash
+rm /boot/config/plugins/dockerMan/templates-user/brain-mcp.xml
+```
+When you click Apply on Add Container, Unraid saves a *second* file with
+your actual values — `my-brain-mcp.xml`, alongside the blank one you
+downloaded — and both declare the same container name. With two templates
+claiming that name, **Update can end up recreating the container from the
+blank original instead of your saved one, wiping BRAIN_NAME/BRAIN_TOKEN/
+the paths and leaving it unable to start.** Once `my-brain-mcp.xml` exists
+(check `ls /boot/config/plugins/dockerMan/templates-user/`), the seed file
+has done its job and isn't needed — remove it so there's no ambiguity.
+Clicking **Update** afterward pulls whatever's newest on
+`ghcr.io/sipho102/brain-mcp:latest` using your saved config, as expected.
 
 ### Serving a second vault
 
