@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -15,7 +15,10 @@ class ConfigError(RuntimeError):
 class Config:
     root: Path
     name: str
-    token: str
+    # repr=False: dataclasses auto-generate __repr__ from every field by
+    # default, which would otherwise print the bearer token in plaintext
+    # anywhere a Config ends up in a log line, traceback, or debugger.
+    token: str = field(repr=False)
     port: int
     bind_address: str
     log_level: str
