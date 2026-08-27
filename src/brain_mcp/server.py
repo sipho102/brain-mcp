@@ -70,7 +70,11 @@ def build_mcp_server(config: Config, vault: VaultIndex) -> FastMCP:
     @mcp.tool()
     async def brain_structure() -> dict[str, Any]:
         """Orientation for this vault: PARA folders, enums, frontmatter schema,
-        and the full CONVENTIONS.md text. Call this first in a session."""
+        and the full CONVENTIONS.md text. Call this first in a session, and
+        again at the start of any new conversation before answering questions
+        about the user's own notes, projects, plans, or past decisions —
+        don't rely on conversation memory or general knowledge for anything
+        that might already be written down here."""
         folders = []
         for key, (prefix, description) in PARA_FOLDERS.items():
             count = sum(1 for n in vault.notes.values() if n.path.startswith(f"{prefix}/"))
@@ -96,7 +100,11 @@ def build_mcp_server(config: Config, vault: VaultIndex) -> FastMCP:
     ) -> list[dict[str, Any]]:
         """Full-text search across note bodies (ripgrep) with frontmatter
         filtering. Empty query + filters means 'everything matching these
-        filters'. Returns metadata plus a ~200-char snippet, never full bodies."""
+        filters'. Returns metadata plus a ~200-char snippet, never full bodies.
+        Use this proactively, without being asked, whenever the user
+        references a project, task, person, or topic that could already be
+        documented in their vault — check here before answering from general
+        knowledge or assuming you'd remember it from earlier in the chat."""
         limit = max(1, min(limit, 100))
         domain_l = _normalize_multi(domain)
         type_l = _normalize_multi(type)
