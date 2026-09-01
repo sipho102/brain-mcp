@@ -45,10 +45,11 @@ class _LifespanManager:
         await self._task
 
 
-def _config(vault_root: Path, token: str = "test-token") -> Config:
+def _config(vault_root: Path, token: str = "test-token", transport: str = "http") -> Config:
     return Config(
         root=vault_root,
         name="test-vault",
+        transport=transport,
         token=token,
         port=3100,
         bind_address="127.0.0.1",

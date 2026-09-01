@@ -15,10 +15,11 @@ class ConfigError(RuntimeError):
 class Config:
     root: Path
     name: str
+    transport: str
     # repr=False: dataclasses auto-generate __repr__ from every field by
     # default, which would otherwise print the bearer token in plaintext
     # anywhere a Config ends up in a log line, traceback, or debugger.
-    token: str = field(repr=False)
+    token: str | None = field(repr=False)
     port: int
     bind_address: str
     log_level: str
@@ -27,9 +28,16 @@ class Config:
     def from_env(cls, env: dict[str, str] | None = None) -> "Config":
         env = env if env is not None else os.environ
 
+        transport = env.get("BRAIN_TRANSPORT", "http").lower()
+        if transport not in {"http", "stdio"}:
+            raise ConfigError(f"BRAIN_TRANSPORT must be 'http' or 'stdio', got: {transport!r}")
+
         root_raw = _require(env, "BRAIN_ROOT")
         name = _require(env, "BRAIN_NAME")
-        token = _require(env, "BRAIN_TOKEN")
+        # The bearer token gates network access; stdio is a local pipe to a
+        # single parent process with no network exposure, so it has nothing
+        # to gate and BRAIN_TOKEN is not required in that mode.
+        token = _require(env, "BRAIN_TOKEN") if transport == "http" else env.get("BRAIN_TOKEN") or None
 
         root = Path(root_raw)
         if not root.is_absolute():
@@ -58,6 +66,7 @@ class Config:
         return cls(
             root=root.resolve(),
             name=name,
+            transport=transport,
             token=token,
             port=port,
             bind_address=bind_address,

@@ -302,22 +302,29 @@ async def _amain() -> None:
         logger.error("Failed to build vault index: %s", exc)
         raise SystemExit(1) from exc
 
-    app = build_app(config, vault)
-
-    import uvicorn
-
-    uv_config = uvicorn.Config(
-        app,
-        host=config.bind_address,
-        port=config.port,
-        log_level=config.log_level.lower(),
-        access_log=False,
-    )
-    server = uvicorn.Server(uv_config)
-
     watch_task = asyncio.create_task(vault.watch_forever())
     try:
-        await server.serve()
+        if config.transport == "stdio":
+            # stdio has no bearer-auth middleware or /health route to wire
+            # up - it's a local pipe to a single parent process, not a
+            # network listener - so we drive the FastMCP object directly
+            # instead of going through build_app()/uvicorn.
+            mcp = build_mcp_server(config, vault)
+            await mcp.run_stdio_async()
+        else:
+            app = build_app(config, vault)
+
+            import uvicorn
+
+            uv_config = uvicorn.Config(
+                app,
+                host=config.bind_address,
+                port=config.port,
+                log_level=config.log_level.lower(),
+                access_log=False,
+            )
+            server = uvicorn.Server(uv_config)
+            await server.serve()
     finally:
         watch_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):

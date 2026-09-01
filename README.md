@@ -9,7 +9,9 @@ An MCP server that exposes a markdown, PARA-structured second-brain vault
 (Obsidian-compatible) as a set of read tools plus a single constrained write
 tool (`capture`, which only ever creates new notes in `00-inbox/`). Runs as a
 Docker container, consumed over streamable-HTTP by Claude Code, opencode, and
-other MCP clients.
+other MCP clients. It can also run locally over stdio (see "Running over
+stdio" below) for clients that launch the server as a subprocess instead of
+connecting to a shared network instance.
 
 Full behavioural spec: see `brain-mcp-spec.md` in this repo (or wherever you
 keep it) if you need the "why" behind a design choice.
@@ -54,14 +56,19 @@ All configuration is via environment variables — nothing about a specific
 vault (path, name, token) is hardcoded, so the same image serves any number
 of sibling vaults as separate containers.
 
-| Variable       | Required | Default   | Meaning                                      |
-|----------------|----------|-----------|-----------------------------------------------|
-| `BRAIN_ROOT`   | yes      | —         | Absolute path to the vault root in-container   |
-| `BRAIN_NAME`   | yes      | —         | Instance name, e.g. `personal` or `family`     |
-| `BRAIN_TOKEN`  | yes      | —         | Bearer token required on every MCP request     |
-| `PORT`         | no       | `3100`    | Listen port                                    |
-| `BIND_ADDRESS` | no       | `0.0.0.0` | Listen address                                 |
-| `LOG_LEVEL`    | no       | `INFO`    | `DEBUG`/`INFO`/`WARNING`/`ERROR`/`CRITICAL`    |
+| Variable         | Required        | Default   | Meaning                                            |
+|------------------|-----------------|-----------|-----------------------------------------------------|
+| `BRAIN_ROOT`     | yes             | —         | Absolute path to the vault root in-container         |
+| `BRAIN_NAME`     | yes             | —         | Instance name, e.g. `personal` or `family`           |
+| `BRAIN_TRANSPORT`| no              | `http`    | `http` (streamable-HTTP) or `stdio`                  |
+| `BRAIN_TOKEN`    | only if `http`  | —         | Bearer token required on every MCP request           |
+| `PORT`           | no              | `3100`    | Listen port (`http` only)                            |
+| `BIND_ADDRESS`   | no              | `0.0.0.0` | Listen address (`http` only)                         |
+| `LOG_LEVEL`      | no              | `INFO`    | `DEBUG`/`INFO`/`WARNING`/`ERROR`/`CRITICAL`          |
+
+`BRAIN_TOKEN` gates network access, so it's not required in `stdio` mode:
+stdio is a local pipe to whichever single process launched the server, with
+no network exposure to gate.
 
 Copy `.env.example` to `.env` and fill in `BRAIN_NAME`, `BRAIN_VAULT_PATH`
 (the host path to your vault), and `BRAIN_TOKEN` (a random secret —
@@ -85,6 +92,43 @@ export BRAIN_NAME=personal
 export BRAIN_TOKEN=dev-token
 uv run brain-mcp
 ```
+
+## Running over stdio
+
+For MCP clients that launch the server as a local subprocess (rather than
+connecting to a shared network instance), set `BRAIN_TRANSPORT=stdio`. No
+`BRAIN_TOKEN`, `PORT`, or `BIND_ADDRESS` is needed:
+
+```bash
+export BRAIN_ROOT=/path/to/vault
+export BRAIN_NAME=personal
+export BRAIN_TRANSPORT=stdio
+uv run brain-mcp
+```
+
+Example Claude Code / Claude Desktop config:
+
+```json
+{
+  "mcpServers": {
+    "brain": {
+      "command": "uv",
+      "args": ["run", "brain-mcp"],
+      "cwd": "/path/to/brain-mcp",
+      "env": {
+        "BRAIN_ROOT": "/path/to/vault",
+        "BRAIN_NAME": "personal",
+        "BRAIN_TRANSPORT": "stdio"
+      }
+    }
+  }
+}
+```
+
+This mode is per-client (one process per session, no sharing across
+clients) — the same tradeoff any stdio MCP server makes. Use `http` mode
+(the default) if you want one running instance shared by multiple clients
+or machines, which is what the Docker/Unraid setup below is for.
 
 ## Running on Unraid
 
