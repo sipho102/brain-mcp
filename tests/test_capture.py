@@ -10,39 +10,33 @@ import pytest
 from brain_mcp import capture as capture_mod
 from brain_mcp.vault import InvalidEnumError, VaultIndex
 
-UUID4_RE = re.compile(
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-)
-
 
 def test_capture_creates_note_in_inbox(vault: VaultIndex, vault_root: Path):
     result = capture_mod.capture_note(
         vault,
         title="A New Idea",
         body="Some body text.",
-        domain="personal",
-        tags=["idea"],
-        source="conversation with Claude",
+        topic="personal",
+        when_to_open="when reviewing new ideas",
+        source="conversation",
         links=["Homelab"],
     )
     assert result["path"].startswith("00-inbox/")
-    assert UUID4_RE.match(result["uid"])
 
     full = vault_root / result["path"]
     assert full.exists()
 
     post = frontmatter.load(full)
-    assert post.metadata["uid"] == result["uid"]
     assert post.metadata["title"] == "A New Idea"
-    assert post.metadata["type"] == "note"
-    assert post.metadata["status"] == "inbox"
-    assert post.metadata["domain"] == "personal"
-    assert post.metadata["tags"] == ["idea"]
-    assert re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$", post.metadata["created"])
-    assert "## Source" in post.content
-    assert "conversation with Claude" in post.content
+    assert post.metadata["type"] == "document"
+    assert post.metadata["status"] == "current"
+    assert post.metadata["topic"] == "personal"
+    assert post.metadata["when-to-open"] == "when reviewing new ideas"
+    assert post.metadata["source"] == "conversation"
+    assert re.match(r"^\d{4}-\d{2}-\d{2}$", post.metadata["created"])
     assert "## Related" in post.content
     assert "[[Homelab]]" in post.content
+    assert "uid" not in post.metadata
 
 
 def test_capture_writes_group_writable_file(vault: VaultIndex, vault_root: Path):
@@ -51,26 +45,92 @@ def test_capture_writes_group_writable_file(vault: VaultIndex, vault_root: Path)
     # isn't that same UID, so captured notes must be group-writable or
     # editing them elsewhere fails with EACCES.
     result = capture_mod.capture_note(
-        vault, title="Permission Check", body="body", domain=None, tags=None, source=None, links=None
+        vault, title="Permission Check", body="body", topic="personal",
+        when_to_open="for testing", source="conversation",
     )
     mode = stat.S_IMODE((vault_root / result["path"]).stat().st_mode)
     assert mode == 0o664
 
 
-def test_capture_default_domain_is_personal(vault: VaultIndex):
+def test_capture_default_type_is_document(vault: VaultIndex):
     result = capture_mod.capture_note(
-        vault, title="No Domain Given", body="body", domain=None, tags=None, source=None, links=None
+        vault, title="No Type Given", body="body", topic="personal",
+        when_to_open="for testing", source="conversation",
     )
     note_path = capture_mod.Path(vault.root) / result["path"]
     post = frontmatter.load(note_path)
-    assert post.metadata["domain"] == "personal"
+    assert post.metadata["type"] == "document"
 
 
-def test_capture_rejects_invalid_domain(vault: VaultIndex):
+def test_capture_rejects_invalid_topic(vault: VaultIndex):
     with pytest.raises(InvalidEnumError):
         capture_mod.capture_note(
-            vault, title="Bad Domain", body="body", domain="not-a-domain", tags=None, source=None, links=None
+            vault, title="Bad Topic", body="body", topic="not-a-topic",
+            when_to_open="for testing", source="conversation",
         )
+
+
+def test_capture_rejects_invalid_type(vault: VaultIndex):
+    with pytest.raises(ValueError):
+        capture_mod.capture_note(
+            vault, title="Bad Type", body="body", topic="personal",
+            when_to_open="for testing", source="conversation", type="price-list",
+        )
+
+
+def test_capture_rejects_empty_when_to_open(vault: VaultIndex):
+    with pytest.raises(ValueError):
+        capture_mod.capture_note(
+            vault, title="No trigger", body="body", topic="personal",
+            when_to_open="", source="conversation",
+        )
+
+
+def test_capture_rejects_empty_source(vault: VaultIndex):
+    with pytest.raises(ValueError):
+        capture_mod.capture_note(
+            vault, title="No source", body="body", topic="personal",
+            when_to_open="for testing", source="",
+        )
+
+
+def test_capture_memory_requires_kind(vault: VaultIndex):
+    with pytest.raises(ValueError):
+        capture_mod.capture_note(
+            vault, title="A memory", body="body", topic="personal",
+            when_to_open="for testing", source="conversation", type="memory",
+        )
+
+
+def test_capture_memory_inference_requires_confidence(vault: VaultIndex):
+    with pytest.raises(ValueError):
+        capture_mod.capture_note(
+            vault, title="A memory", body="body", topic="personal",
+            when_to_open="for testing", source="conversation", type="memory",
+            kind="inference",
+        )
+
+
+def test_capture_memory_with_kind_and_confidence(vault: VaultIndex, vault_root: Path):
+    result = capture_mod.capture_note(
+        vault, title="A memory", body="body", topic="personal",
+        when_to_open="for testing", source="conversation", type="memory",
+        kind="inference", confidence="high",
+    )
+    post = frontmatter.load(vault_root / result["path"])
+    assert post.metadata["type"] == "memory"
+    assert post.metadata["kind"] == "inference"
+    assert post.metadata["confidence"] == "high"
+
+
+def test_capture_supersedes_field(vault: VaultIndex, vault_root: Path):
+    result = capture_mod.capture_note(
+        vault, title="Replacement note", body="body", topic="personal",
+        when_to_open="for testing", source="conversation",
+        supersedes="[[old-note]]",
+    )
+    post = frontmatter.load(vault_root / result["path"])
+    assert post.metadata["supersedes"] == "[[old-note]]"
 
 
 def _freeze_capture_clock(monkeypatch, when):
@@ -90,18 +150,20 @@ def test_capture_filename_collision_appends_suffix(vault: VaultIndex, vault_root
     _freeze_capture_clock(monkeypatch, real_datetime.datetime(2026, 3, 1, 12, 0, 0))
 
     r1 = capture_mod.capture_note(
-        vault, title="Same Title", body="1", domain=None, tags=None, source=None, links=None
+        vault, title="Same Title", body="1", topic="personal",
+        when_to_open="for testing", source="conversation",
     )
     r2 = capture_mod.capture_note(
-        vault, title="Same Title", body="2", domain=None, tags=None, source=None, links=None
+        vault, title="Same Title", body="2", topic="personal",
+        when_to_open="for testing", source="conversation",
     )
     r3 = capture_mod.capture_note(
-        vault, title="Same Title", body="3", domain=None, tags=None, source=None, links=None
+        vault, title="Same Title", body="3", topic="personal",
+        when_to_open="for testing", source="conversation",
     )
     assert r1["path"] == "00-inbox/2026-03-01-same-title.md"
     assert r2["path"] == "00-inbox/2026-03-01-same-title-2.md"
     assert r3["path"] == "00-inbox/2026-03-01-same-title-3.md"
-    assert r1["uid"] != r2["uid"] != r3["uid"]
 
 
 def test_capture_never_overwrites(vault: VaultIndex, vault_root: Path, monkeypatch):
@@ -110,15 +172,16 @@ def test_capture_never_overwrites(vault: VaultIndex, vault_root: Path, monkeypat
     inbox = vault_root / "00-inbox"
     inbox.mkdir(exist_ok=True)
     existing = inbox / "2026-01-01-pre-existing.md"
-    existing.write_text("---\nuid: x\n---\n\noriginal\n", encoding="utf-8")
+    existing.write_text("---\ntitle: x\n---\n\noriginal\n", encoding="utf-8")
 
     _freeze_capture_clock(monkeypatch, real_datetime.datetime(2026, 1, 1, 12, 0, 0))
 
     capture_mod.capture_note(
-        vault, title="pre existing", body="new", domain=None, tags=None, source=None, links=None
+        vault, title="pre existing", body="new", topic="personal",
+        when_to_open="for testing", source="conversation",
     )
 
-    assert existing.read_text(encoding="utf-8") == "---\nuid: x\n---\n\noriginal\n"
+    assert existing.read_text(encoding="utf-8") == "---\ntitle: x\n---\n\noriginal\n"
 
 
 def test_capture_refuses_traversal_via_malicious_title(vault: VaultIndex, vault_root: Path):
@@ -126,10 +189,9 @@ def test_capture_refuses_traversal_via_malicious_title(vault: VaultIndex, vault_
         vault,
         title="../../../etc/passwd",
         body="pwned?",
-        domain=None,
-        tags=None,
-        source=None,
-        links=None,
+        topic="personal",
+        when_to_open="for testing",
+        source="conversation",
     )
     full = (vault_root / result["path"]).resolve()
     inbox = (vault_root / "00-inbox").resolve()
@@ -149,6 +211,7 @@ def test_capture_refuses_traversal_via_malicious_title(vault: VaultIndex, vault_
 )
 def test_capture_slug_matches_title(vault: VaultIndex, title: str, expected_slug: str):
     result = capture_mod.capture_note(
-        vault, title=title, body="body", domain=None, tags=None, source=None, links=None
+        vault, title=title, body="body", topic="personal",
+        when_to_open="for testing", source="conversation",
     )
     assert expected_slug in result["path"]

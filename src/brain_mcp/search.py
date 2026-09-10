@@ -7,7 +7,7 @@ import logging
 import subprocess
 from pathlib import Path, PurePosixPath
 
-from .vault import EXCLUDED_DIR_PREFIXES
+from .vault import EXCLUDED_DIR_PREFIXES, EXCLUDED_FILES
 
 logger = logging.getLogger("brain_mcp.search")
 
@@ -22,6 +22,8 @@ def _exclude_globs() -> list[str]:
     globs = []
     for prefix in EXCLUDED_DIR_PREFIXES:
         globs.extend(["-g", f"!/{prefix}**"])
+    for filename in EXCLUDED_FILES:
+        globs.extend(["-g", f"!/{filename}"])
     return globs
 
 

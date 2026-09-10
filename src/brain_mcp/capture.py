@@ -9,40 +9,54 @@ from pathlib import Path
 
 import yaml
 
-from .vault import TIMESTAMP_FORMAT, VaultIndex, slugify
+from .vault import DATE_FORMAT, VaultIndex, slugify
 
 INBOX_DIR = "00-inbox"
-DEFAULT_DOMAIN = "personal"
+
+# CAPTURE.md restricts capture() to these three types even though the full
+# vault `type` enum (see CONVENTIONS.md) also has `price-list` — that type
+# is for large structured reference data, never something an LLM captures.
+CAPTURE_TYPES = ("document", "memory", "journal")
+KINDS = ("evidence", "inference")
+CONFIDENCES = ("high", "medium", "low")
 
 
 def build_note_text(
     *,
-    uid: str,
     title: str,
-    domain: str,
+    type: str,
+    topic: str,
+    when_to_open: str,
     now: str,
     body: str,
-    tags: list[str] | None,
-    source: str | None,
+    source: str,
+    kind: str | None,
+    confidence: str | None,
+    supersedes: str | None,
     links: list[str] | None,
 ) -> str:
-    frontmatter = {
-        "uid": uid,
+    frontmatter: dict[str, object] = {
+        "type": type,
         "title": title,
-        "type": "note",
-        "status": "inbox",
-        "domain": domain,
-        "tags": list(tags) if tags else [],
+        "topic": topic,
+        "when-to-open": when_to_open,
         "created": now,
         "updated": now,
+        "status": "current",
     }
+    if supersedes:
+        frontmatter["supersedes"] = supersedes
+    if kind:
+        frontmatter["kind"] = kind
+    if confidence:
+        frontmatter["confidence"] = confidence
+    frontmatter["source"] = source
+
     fm_text = yaml.safe_dump(
         frontmatter, sort_keys=False, allow_unicode=True, default_flow_style=None
     ).rstrip("\n")
 
     lines = ["---", fm_text, "---", "", body.rstrip(), ""]
-    if source:
-        lines += ["## Source", "", source.strip(), ""]
     if links:
         lines += ["## Related", ""]
         lines += [f"- [[{link}]]" for link in links]
@@ -55,16 +69,29 @@ def capture_note(
     *,
     title: str,
     body: str,
-    domain: str | None,
-    tags: list[str] | None,
-    source: str | None,
-    links: list[str] | None,
+    topic: str,
+    when_to_open: str,
+    source: str,
+    type: str = "document",
+    kind: str | None = None,
+    confidence: str | None = None,
+    supersedes: str | None = None,
+    links: list[str] | None = None,
 ) -> dict[str, str]:
     if not title or not title.strip():
         raise ValueError("title must not be empty")
+    if not when_to_open or not when_to_open.strip():
+        raise ValueError("when_to_open must not be empty")
+    if not source or not source.strip():
+        raise ValueError("source must not be empty")
+    if type not in CAPTURE_TYPES:
+        raise ValueError(f"Invalid type {type!r}. Valid values: {', '.join(CAPTURE_TYPES)}")
+    if type == "memory" and kind not in KINDS:
+        raise ValueError(f"type: memory requires kind to be one of {', '.join(KINDS)}")
+    if kind == "inference" and confidence not in CONFIDENCES:
+        raise ValueError(f"kind: inference requires confidence to be one of {', '.join(CONFIDENCES)}")
 
-    resolved_domain = domain or DEFAULT_DOMAIN
-    vault.validate_enum("domain", resolved_domain)
+    vault.validate_enum("topic", topic)
 
     inbox_dir = vault.safe_resolve(INBOX_DIR, must_be_under=INBOX_DIR)
     inbox_dir.mkdir(parents=True, exist_ok=True)
@@ -72,8 +99,7 @@ def capture_note(
     now = datetime.now()
     date_prefix = now.strftime("%Y-%m-%d")
     slug = slugify(title) or "untitled"
-    stamp = now.strftime(TIMESTAMP_FORMAT)
-    new_uid = str(uuid.uuid4())
+    stamp = now.strftime(DATE_FORMAT)
 
     filename = _first_available_filename(inbox_dir, date_prefix, slug)
     # Defense in depth: even though the slug is already sanitized to
@@ -81,20 +107,23 @@ def capture_note(
     target = vault.safe_resolve(f"{INBOX_DIR}/{filename}", must_be_under=INBOX_DIR)
 
     text = build_note_text(
-        uid=new_uid,
         title=title.strip(),
-        domain=resolved_domain,
+        type=type,
+        topic=topic,
+        when_to_open=when_to_open.strip(),
         now=stamp,
         body=body or "",
-        tags=tags,
-        source=source,
+        source=source.strip(),
+        kind=kind,
+        confidence=confidence,
+        supersedes=supersedes,
         links=links,
     )
 
     _write_atomic(target, text)
 
     rel_path = f"{INBOX_DIR}/{filename}"
-    return {"path": rel_path, "uid": new_uid}
+    return {"path": rel_path}
 
 
 def _first_available_filename(inbox_dir: Path, date_prefix: str, slug: str) -> str:

@@ -9,7 +9,7 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/sipho102/brain-mcp</Support>
   <Project>https://github.com/sipho102/brain-mcp</Project>
-  <Overview>MCP server exposing a markdown, PARA-structured Obsidian vault as read tools plus a single constrained write tool (capture, which only ever creates new notes in 00-inbox/). One container serves exactly one vault - for a second vault, add this template again with a different name/token/paths/port. Pulls the prebuilt image from GHCR, so there's nothing to clone or build first.</Overview>
+  <Overview>MCP server exposing a flat, retrieval-first markdown Obsidian vault as read tools plus a single constrained write tool (capture, which only ever creates new notes in 00-inbox/). One container serves exactly one vault - for a second vault, add this template again with a different name/token/paths/port. Pulls the prebuilt image from GHCR, so there's nothing to clone or build first.</Overview>
   <Category>Productivity: Tools:</Category>
   <WebUI>http://[IP]:[PORT:3100]/health</WebUI>
   <TemplateURL/>

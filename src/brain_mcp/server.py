@@ -16,7 +16,7 @@ from starlette.responses import JSONResponse, Response
 
 from . import capture as capture_mod
 from .config import Config, ConfigError
-from .vault import PARA_FOLDERS, FRONTMATTER_SCHEMA, VaultIndex, VaultError
+from .vault import VAULT_FOLDERS, FRONTMATTER_SCHEMA, VaultIndex, VaultError
 from .search import search_content
 
 logger = logging.getLogger("brain_mcp.server")
@@ -39,23 +39,13 @@ def _validate_multi(vault: VaultIndex, field_name: str, values: list[str] | None
         vault.validate_enum(field_name, v)
 
 
-def _validate_para(values: list[str] | None) -> None:
-    if not values:
-        return
-    invalid = [v for v in values if v not in PARA_FOLDERS]
-    if invalid:
-        raise VaultError(
-            f"Invalid para value(s) {invalid}. Valid values: {', '.join(sorted(PARA_FOLDERS))}"
-        )
-
-
 def build_mcp_server(config: Config, vault: VaultIndex) -> FastMCP:
     mcp = FastMCP(
         name=f"brain-mcp ({config.name})",
         instructions=(
-            "Read/search tools over a markdown PARA vault, plus a single "
-            "constrained capture() write tool that only creates notes in "
-            "00-inbox/. Call brain_structure() first in a session."
+            "Read/search tools over a flat, retrieval-first markdown vault, "
+            "plus a single constrained capture() write tool that only creates "
+            "notes in 00-inbox/. Call brain_structure() first in a session."
         ),
         # We drive uvicorn ourselves (see build_app/_amain), so FastMCP's
         # host/port are irrelevant here. DNS-rebinding host-header checking
@@ -69,14 +59,14 @@ def build_mcp_server(config: Config, vault: VaultIndex) -> FastMCP:
 
     @mcp.tool()
     async def brain_structure() -> dict[str, Any]:
-        """Orientation for this vault: PARA folders, enums, frontmatter schema,
-        and the full CONVENTIONS.md text. Call this first in a session, and
-        again at the start of any new conversation before answering questions
-        about the user's own notes, projects, plans, or past decisions —
-        don't rely on conversation memory or general knowledge for anything
-        that might already be written down here."""
+        """Orientation for this vault: top-level folders, enums, frontmatter
+        schema, and the full CONVENTIONS.md text. Call this first in a
+        session, and again at the start of any new conversation before
+        answering questions about the user's own notes, projects, plans, or
+        past decisions — don't rely on conversation memory or general
+        knowledge for anything that might already be written down here."""
         folders = []
-        for key, (prefix, description) in PARA_FOLDERS.items():
+        for key, (prefix, description) in VAULT_FOLDERS.items():
             count = sum(1 for n in vault.notes.values() if n.path.startswith(f"{prefix}/"))
             folders.append({"key": key, "path": prefix, "description": description, "note_count": count})
         return {
@@ -91,11 +81,9 @@ def build_mcp_server(config: Config, vault: VaultIndex) -> FastMCP:
     @mcp.tool()
     async def search_notes(
         query: str = "",
-        domain: _Multi = None,
+        topic: _Multi = None,
         type: _Multi = None,
         status: _Multi = None,
-        para: _Multi = None,
-        tag: str | None = None,
         limit: int = 20,
     ) -> list[dict[str, Any]]:
         """Full-text search across note bodies (ripgrep) with frontmatter
@@ -106,21 +94,19 @@ def build_mcp_server(config: Config, vault: VaultIndex) -> FastMCP:
         documented in their vault — check here before answering from general
         knowledge or assuming you'd remember it from earlier in the chat."""
         limit = max(1, min(limit, 100))
-        domain_l = _normalize_multi(domain)
+        topic_l = _normalize_multi(topic)
         type_l = _normalize_multi(type)
         status_l = _normalize_multi(status)
-        para_l = _normalize_multi(para)
-        _validate_multi(vault, "domain", domain_l)
+        _validate_multi(vault, "topic", topic_l)
         _validate_multi(vault, "type", type_l)
         _validate_multi(vault, "status", status_l)
-        _validate_para(para_l)
 
         content_hits = await asyncio.to_thread(search_content, query, vault.root)
         if query and not content_hits:
             return []
 
         results = []
-        for note in vault.iter_notes(para=para_l, domain=domain_l, status=status_l, type_=type_l, tag=tag):
+        for note in vault.iter_notes(topic=topic_l, status=status_l, type_=type_l):
             hit = content_hits.get(note.path)
             if query and hit is None:
                 continue
@@ -131,7 +117,7 @@ def build_mcp_server(config: Config, vault: VaultIndex) -> FastMCP:
         if query:
             results.sort(key=lambda r: (-r[0], r[1].path))
         else:
-            results.sort(key=lambda r: r[1].updated_dt, reverse=True)
+            results.sort(key=lambda r: (r[1].updated_dt, r[1].path), reverse=True)
 
         out = []
         for _rank, note, snippet in results[:limit]:
@@ -142,38 +128,35 @@ def build_mcp_server(config: Config, vault: VaultIndex) -> FastMCP:
 
     @mcp.tool()
     async def read_note(identifier: str) -> dict[str, Any]:
-        """Read a full note by vault-relative path, full uid, or an
-        unambiguous uid prefix (>=8 chars)."""
+        """Read a full note by vault-relative path, or by its bare filename
+        (with or without .md) — filenames are unique vault-wide, so the
+        short form is usually enough."""
         note = vault.find_by_identifier(identifier)
         return {
             "path": note.path,
             "frontmatter": note.frontmatter,
             "content": note.body,
             "outbound_links": [link.as_dict() for link in note.outbound_links],
-            "paperless": note.paperless,
         }
 
     @mcp.tool()
     async def list_notes(
-        para: _Multi = None,
-        domain: _Multi = None,
+        topic: _Multi = None,
         status: _Multi = None,
         type: _Multi = None,
         limit: int = 50,
     ) -> list[dict[str, Any]]:
         """Metadata-only enumeration (no content search) for cheap browsing."""
         limit = max(1, min(limit, 200))
-        para_l = _normalize_multi(para)
-        domain_l = _normalize_multi(domain)
+        topic_l = _normalize_multi(topic)
         status_l = _normalize_multi(status)
         type_l = _normalize_multi(type)
-        _validate_multi(vault, "domain", domain_l)
+        _validate_multi(vault, "topic", topic_l)
         _validate_multi(vault, "type", type_l)
         _validate_multi(vault, "status", status_l)
-        _validate_para(para_l)
 
-        notes = list(vault.iter_notes(para=para_l, domain=domain_l, status=status_l, type_=type_l))
-        notes.sort(key=lambda n: n.updated_dt, reverse=True)
+        notes = list(vault.iter_notes(topic=topic_l, status=status_l, type_=type_l))
+        notes.sort(key=lambda n: (n.updated_dt, n.path), reverse=True)
         return [n.metadata_dict() for n in notes[:limit]]
 
     @mcp.tool()
@@ -185,20 +168,34 @@ def build_mcp_server(config: Config, vault: VaultIndex) -> FastMCP:
     async def capture(
         title: str,
         body: str,
-        domain: str | None = None,
-        tags: list[str] | None = None,
-        source: str | None = None,
+        topic: str,
+        when_to_open: str,
+        source: str,
+        type: str = "document",
+        kind: str | None = None,
+        confidence: str | None = None,
+        supersedes: str | None = None,
         links: list[str] | None = None,
     ) -> dict[str, str]:
-        """Create a new note in 00-inbox/. The only write this server can do."""
+        """Create a new note in 00-inbox/. The only write this server can do.
+        Follow CAPTURE.md (vault root): write the fact, not the narrative;
+        one fact per note; type is document/memory/journal; when_to_open is a
+        retrieval trigger, not a summary; source is required (a URL,
+        'conversation', or paperless:<id>); kind (evidence/inference) is
+        required when type is memory, and confidence when kind is
+        inference."""
         result = await asyncio.to_thread(
             capture_mod.capture_note,
             vault,
             title=title,
             body=body,
-            domain=domain,
-            tags=tags,
+            topic=topic,
+            when_to_open=when_to_open,
             source=source,
+            type=type,
+            kind=kind,
+            confidence=confidence,
+            supersedes=supersedes,
             links=links,
         )
         # Make the new note immediately visible without waiting for the watcher.

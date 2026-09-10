@@ -4,8 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-An MCP server (streamable-HTTP transport) that exposes a markdown,
-PARA-structured Obsidian vault as six tools: five read tools plus one
+An MCP server (streamable-HTTP transport) that exposes a flat,
+retrieval-first markdown Obsidian vault as six tools: five read tools plus one
 constrained write tool (`capture`, which only ever creates new notes in
 `00-inbox/`). One running container serves exactly one vault; a second
 vault is a second, independent container built from the same image. Full
@@ -24,7 +24,7 @@ uv run pytest
 
 # Run a single test file or test
 uv run pytest tests/test_vault.py
-uv run pytest tests/test_vault.py::test_find_by_full_uid
+uv run pytest tests/test_vault.py::test_find_by_bare_filename
 
 # Run the server locally (requires BRAIN_ROOT, BRAIN_NAME, BRAIN_TOKEN)
 export BRAIN_ROOT=/path/to/vault BRAIN_NAME=personal BRAIN_TOKEN=dev-token
@@ -44,8 +44,8 @@ configured in this repo.
 
 - `config.py` — env var parsing/validation, fails fast with a clear error.
 - `vault.py` — the index: frontmatter parsing, exclusions, path safety,
-  uid resolution, wikilink resolution, CONVENTIONS.md enum parsing,
-  `watchfiles`-driven live reindexing.
+  filename-based identifier resolution, wikilink resolution, CONVENTIONS.md
+  enum parsing, `watchfiles`-driven live reindexing.
 - `search.py` — ripgrep subprocess wrapper for content search. No content
   index is built; ripgrep runs against the filesystem on every call.
 - `capture.py` — the one write path (note creation in `00-inbox/`).
@@ -102,19 +102,21 @@ reasons, not the primary mechanism.
 **The CONVENTIONS.md enum parser (`_extract_enum_values`) is a heuristic,
 not a fixed-format assumption**, and it fails loudly (raises `VaultError`
 at startup) rather than falling back to defaults if it can't parse
-non-empty `type`/`status`/`domain` values. It tries a bold-inline-label
-shape first (`**type:** \`note\`, \`project\`, ...` all under one `##
+non-empty `type`/`status`/`topic` values. It tries a bold-inline-label
+shape first (`**type:** \`document\`, \`memory\`, ...` all under one `##
 Enums` heading — confirmed against the real reference vault, bounded to
 just the label's own paragraph so it doesn't pick up unrelated
 backtick-quoted words in the prose below), then falls back to a
 per-field-heading shape. If a vault's `CONVENTIONS.md` restructures its
 Enums section, this is the function to revisit.
 
-**`capture()` always generates a UUIDv4 `uid`, regardless of what any given
-vault's `CONVENTIONS.md` says.** This was a deliberate choice (see README
-for the full reasoning) — it's also what keeps `read_note`'s unambiguous
-≥8-char uid-prefix lookup meaningful, which it wouldn't be against a
-low-entropy, date-based id scheme.
+**There is no `uid` field anywhere in this schema.** Identity is the note's
+filename, which the vault's own `CONVENTIONS.md` guarantees is unique
+vault-wide. `find_by_identifier` matches a full vault-relative path first,
+then falls back to a bare filename/stem match across the whole note set —
+and raises `AmbiguousIdentifierError` (listing candidates) rather than
+guessing if that stem match isn't unique. `capture()` does not generate or
+write a `uid` field; do not reintroduce one.
 
 **Path safety is checked in code, independent of the Docker mount.**
 `VaultIndex.safe_resolve()` re-resolves symlinks and checks containment on

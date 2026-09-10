@@ -82,8 +82,9 @@ async def test_brain_structure_lists_tools_and_enums(vault: VaultIndex, vault_ro
     data = _dict_result(res)
     assert data["name"] == "test-vault"
     assert data["total_notes"] == len(vault.notes)
-    assert set(data["enums"]["domain"]) == {"personal", "work", "health", "finance"}
+    assert set(data["enums"]["topic"]) == {"inventx", "homelab", "gaming", "personal", "finance", "home"}
     assert any(f["path"] == "00-inbox" for f in data["folders"])
+    assert any(f["path"] == "documents" for f in data["folders"])
 
 
 async def test_search_notes_empty_query_excludes_templates(vault: VaultIndex, vault_root: Path):
@@ -94,26 +95,27 @@ async def test_search_notes_empty_query_excludes_templates(vault: VaultIndex, va
     assert len(paths) > 0
     assert all("90-meta/templates" not in p for p in paths)
     assert all(not p.endswith("note-template.md") for p in paths)
+    assert all(p != "hub.md" for p in paths)
+    assert all("journal/archive" not in p for p in paths)
 
 
 async def test_search_notes_invalid_enum_errors_clearly(vault: VaultIndex, vault_root: Path):
     mcp = build_mcp_server(_config(vault_root), vault)
-    res = await _call(mcp, "search_notes", {"query": "", "domain": "not-a-domain"})
+    res = await _call(mcp, "search_notes", {"query": "", "topic": "not-a-topic"})
     assert res.isError
-    assert "not-a-domain" in res.content[0].text
+    assert "not-a-topic" in res.content[0].text
 
 
-async def test_read_note_by_full_uid_and_prefix(vault: VaultIndex, vault_root: Path):
+async def test_read_note_by_path_and_bare_filename(vault: VaultIndex, vault_root: Path):
     mcp = build_mcp_server(_config(vault_root), vault)
-    full = await _call(mcp, "read_note", {"identifier": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"})
+    full = await _call(mcp, "read_note", {"identifier": "documents/homelab/homelab.md"})
     data = _dict_result(full)
-    assert data["path"] == "20-areas/homelab/_index.md"
-    assert "paperless" in data
-    assert data["paperless"] == []
+    assert data["path"] == "documents/homelab/homelab.md"
+    assert data["frontmatter"]["topic"] == "homelab"
 
-    prefix = await _call(mcp, "read_note", {"identifier": "aaaaaaaa"})
-    data2 = _dict_result(prefix)
-    assert data2["path"] == "20-areas/homelab/_index.md"
+    short = await _call(mcp, "read_note", {"identifier": "homelab"})
+    data2 = _dict_result(short)
+    assert data2["path"] == "documents/homelab/homelab.md"
 
 
 async def test_read_note_not_found_is_clear_error(vault: VaultIndex, vault_root: Path):
@@ -124,10 +126,10 @@ async def test_read_note_not_found_is_clear_error(vault: VaultIndex, vault_root:
 
 async def test_get_backlinks(vault: VaultIndex, vault_root: Path):
     mcp = build_mcp_server(_config(vault_root), vault)
-    res = await _call(mcp, "get_backlinks", {"identifier": "20-areas/homelab/router-notes.md"})
+    res = await _call(mcp, "get_backlinks", {"identifier": "documents/homelab/router-notes.md"})
     results = _list_result(res)
     paths = {r["path"] for r in results}
-    assert "20-areas/homelab/_index.md" in paths
+    assert "documents/homelab/homelab.md" in paths
 
 
 async def test_capture_end_to_end(vault: VaultIndex, vault_root: Path):
@@ -135,13 +137,35 @@ async def test_capture_end_to_end(vault: VaultIndex, vault_root: Path):
     res = await _call(
         mcp,
         "capture",
-        {"title": "From a test", "body": "hello", "source": "pytest"},
+        {
+            "title": "From a test",
+            "body": "hello",
+            "topic": "personal",
+            "when_to_open": "when testing capture",
+            "source": "pytest",
+        },
     )
     data = _dict_result(res)
     assert data["path"].startswith("00-inbox/")
     assert (vault_root / data["path"]).exists()
     # Immediately visible without waiting for the watcher.
     assert data["path"] in vault.notes
+
+
+async def test_capture_invalid_topic_errors_clearly(vault: VaultIndex, vault_root: Path):
+    mcp = build_mcp_server(_config(vault_root), vault)
+    res = await _call(
+        mcp,
+        "capture",
+        {
+            "title": "Bad topic",
+            "body": "hello",
+            "topic": "not-a-topic",
+            "when_to_open": "when testing capture",
+            "source": "pytest",
+        },
+    )
+    assert res.isError
 
 
 # -- auth (raw ASGI, no MCP client machinery) -------------------------------
@@ -236,4 +260,3 @@ async def test_mcp_initialize_handshake_with_correct_token(vault: VaultIndex, va
                     "get_backlinks",
                     "capture",
                 }
-
