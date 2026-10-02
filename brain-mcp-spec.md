@@ -227,8 +227,17 @@ The only write. Creates a new note in `00-inbox/`. Follows `CAPTURE.md`
 - Filename: `YYYY-MM-DD-<slug>.md`, slug derived from `title` — lowercased,
   Unicode-normalised (NFD, combining marks stripped, so `ü` becomes `u`),
   non-alphanumerics collapsed to hyphens, leading and trailing hyphens
-  trimmed, truncated to 60 characters. This mirrors the slug logic in the
-  vault's Templater note template; keep the two consistent.
+  trimmed, truncated to at most 80 characters on a hyphen boundary (never
+  mid-word). A trailing date or parenthesised date in the title is dropped
+  before slugging, since the filename already has a date prefix. The
+  result includes `filename` (basename without `.md`), the only valid
+  wikilink target for the note.
+- If a note with the same normalised title (lowercase, punctuation
+  stripped, whitespace collapsed) is already in `00-inbox/`, nothing is
+  written and the error names it and points at `capture_update`.
+- A body with literal `\n` and at most one real newline is unescaped
+  (`\n`, `\t`) before writing. Frontmatter is block-style YAML; legacy
+  `uid`/`domain`/`tags` fields are rejected.
 - On filename collision, append `-2`, `-3`, and so on. **Never overwrite an
   existing file under any circumstance.**
 - Frontmatter: `type` defaults to `document` (`document`/`memory`/`journal`
@@ -375,9 +384,9 @@ Done when:
 1. `docker compose up` starts cleanly and `/health` responds.
 2. `curl` with a valid bearer token completes an MCP `initialize` handshake;
    without one it gets a 401.
-3. `claude mcp add --transport http --scope user brain http://<host>:3100/mcp --header "Authorization: Bearer <token>"` connects, and `/mcp` in a Claude Code session lists all six tools.
+3. `claude mcp add --transport http --scope user brain http://<host>:3100/mcp --header "Authorization: Bearer <token>"` connects, and `/mcp` in a Claude Code session lists all seven tools.
 4. An opencode config with `type: "remote"` and `oauth: false` connects and
-   lists the same six tools.
+   lists the same seven tools.
 5. `search_notes` with an empty query returns real notes and **zero**
    template files.
 6. `read_note` resolves a note by vault-relative path and by bare filename.

@@ -5,9 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 An MCP server (streamable-HTTP transport) that exposes a flat,
-retrieval-first markdown Obsidian vault as six tools: five read tools plus one
-constrained write tool (`capture`, which only ever creates new notes in
-`00-inbox/`). One running container serves exactly one vault; a second
+retrieval-first markdown Obsidian vault as seven tools: five read tools plus two
+constrained write tools (`capture`, which only ever creates new notes in
+`00-inbox/`, and `capture_update`, which edits notes still in `00-inbox/`). One running container serves exactly one vault; a second
 vault is a second, independent container built from the same image. Full
 behavioral spec is in `brain-mcp-spec.md`.
 
@@ -48,8 +48,8 @@ configured in this repo.
   enum parsing, `watchfiles`-driven live reindexing.
 - `search.py` — ripgrep subprocess wrapper for content search. No content
   index is built; ripgrep runs against the filesystem on every call.
-- `capture.py` — the one write path (note creation in `00-inbox/`).
-- `server.py` — the six `@mcp.tool()` definitions, the bearer-auth ASGI
+- `capture.py` — the write paths (note creation and inbox-note updates, both confined to `00-inbox/`), plus frontmatter validation.
+- `server.py` — the seven `@mcp.tool()` definitions, the bearer-auth ASGI
   middleware, and process startup/shutdown wiring.
 
 ## Architecture notes that aren't obvious from any single file

@@ -259,4 +259,5 @@ async def test_mcp_initialize_handshake_with_correct_token(vault: VaultIndex, va
                     "list_notes",
                     "get_backlinks",
                     "capture",
+                    "capture_update",
                 }

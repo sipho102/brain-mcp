@@ -230,7 +230,7 @@ claude mcp add --transport http --scope user brain \
   --header "Authorization: Bearer <token>"
 ```
 
-Then `/mcp` in a session should list all six tools.
+Then `/mcp` in a session should list all seven tools.
 
 **Known quirk:** Claude Code has had recurring bugs where headers set via
 `--header` aren't sent during session establishment, producing 401s even
@@ -313,8 +313,12 @@ Six tools, kept deliberately small (tool schemas cost client context):
 - `get_backlinks(identifier)` — notes that link to this one, with the
   context line.
 - `capture(title, body, topic, when_to_open, source, type, kind, confidence, supersedes, links)`
-  — the only write: creates a new note in `00-inbox/` per `CAPTURE.md`'s
-  rules. Never overwrites, never touches anything outside the inbox.
+  — creates a new note in `00-inbox/` per `CAPTURE.md`'s rules and returns
+  its `filename` (the only valid wikilink target). Rejects a title already
+  in the inbox. Never overwrites, never touches anything outside the inbox.
+- `capture_update(filename, content, mode, frontmatter)` — appends to
+  (`## Update YYYY-MM-DD`) or replaces the body of a note still in
+  `00-inbox/`, merging and re-validating frontmatter.
 
 ## What this deliberately doesn't do
 

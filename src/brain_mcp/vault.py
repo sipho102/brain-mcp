@@ -175,14 +175,20 @@ def is_excluded(rel_posix: str) -> bool:
     return any(rel_posix.startswith(prefix) for prefix in EXCLUDED_DIR_PREFIXES)
 
 
-def slugify(title: str, max_len: int = 60) -> str:
+def slugify(title: str, max_len: int = 80) -> str:
     """Mirror the vault's Templater slug logic: NFD-normalise, strip combining
-    marks, lowercase, collapse non-alphanumerics to hyphens, trim."""
+    marks, lowercase, collapse non-alphanumerics to hyphens, trim. Truncates
+    on a hyphen boundary, never mid-word, so a caller guessing the slug from
+    the title gets a prefix of whole words."""
     normalized = unicodedata.normalize("NFD", title)
     stripped = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
     lowered = stripped.lower()
     slug = re.sub(r"[^a-z0-9]+", "-", lowered).strip("-")
-    return slug[:max_len].strip("-")
+    if len(slug) <= max_len:
+        return slug
+    # Look one char past the limit so a word ending exactly at max_len survives.
+    head = slug[: max_len + 1]
+    return head.rsplit("-", 1)[0] if "-" in head else slug[:max_len]
 
 
 def _extract_wikilinks(body: str) -> list[RawLink]:

@@ -149,16 +149,17 @@ def test_capture_filename_collision_appends_suffix(vault: VaultIndex, vault_root
 
     _freeze_capture_clock(monkeypatch, real_datetime.datetime(2026, 3, 1, 12, 0, 0))
 
+    # Distinct titles (identical ones are rejected as duplicates) that slug the same.
     r1 = capture_mod.capture_note(
         vault, title="Same Title", body="1", topic="personal",
         when_to_open="for testing", source="conversation",
     )
     r2 = capture_mod.capture_note(
-        vault, title="Same Title", body="2", topic="personal",
+        vault, title="Same-Title", body="2", topic="personal",
         when_to_open="for testing", source="conversation",
     )
     r3 = capture_mod.capture_note(
-        vault, title="Same Title", body="3", topic="personal",
+        vault, title="Same Title (2026-03-01)", body="3", topic="personal",
         when_to_open="for testing", source="conversation",
     )
     assert r1["path"] == "00-inbox/2026-03-01-same-title.md"

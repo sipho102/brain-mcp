@@ -44,8 +44,8 @@ def build_mcp_server(config: Config, vault: VaultIndex) -> FastMCP:
         name=f"brain-mcp ({config.name})",
         instructions=(
             "Read/search tools over a flat, retrieval-first markdown vault, "
-            "plus a single constrained capture() write tool that only creates "
-            "notes in 00-inbox/. Call brain_structure() first in a session."
+            "plus capture()/capture_update() write tools that only create "
+            "and edit notes in 00-inbox/. Call brain_structure() first in a session."
         ),
         # We drive uvicorn ourselves (see build_app/_amain), so FastMCP's
         # host/port are irrelevant here. DNS-rebinding host-header checking
@@ -183,7 +183,12 @@ def build_mcp_server(config: Config, vault: VaultIndex) -> FastMCP:
         retrieval trigger, not a summary; source is required (a URL,
         'conversation', or paperless:<id>); kind (evidence/inference) is
         required when type is memory, and confidence when kind is
-        inference."""
+        inference.
+
+        Returns `filename` (no .md): that is the note's wikilink target and
+        the ONLY valid way to link to it ([[filename]]). Never guess a
+        filename from the title. If a note with the same title is already in
+        the inbox this errors and names it; use capture_update instead."""
         result = await asyncio.to_thread(
             capture_mod.capture_note,
             vault,
@@ -199,6 +204,32 @@ def build_mcp_server(config: Config, vault: VaultIndex) -> FastMCP:
             links=links,
         )
         # Make the new note immediately visible without waiting for the watcher.
+        await asyncio.to_thread(vault.reindex_paths, {result["path"]})
+        return result
+
+    @mcp.tool()
+    async def capture_update(
+        filename: str,
+        content: str,
+        mode: str = "append",
+        frontmatter: dict[str, str | None] | None = None,
+    ) -> dict[str, str]:
+        """Use this instead of a new capture() when correcting or extending a
+        note you captured earlier in this inbox, especially when a diagnosis
+        changes. `filename` is the value capture() returned; only notes still
+        in 00-inbox/ can be updated. mode 'append' adds `content` under a
+        '## Update YYYY-MM-DD' heading; 'replace' replaces the whole body.
+        `frontmatter` fields (e.g. {"kind": "inference", "confidence":
+        "high"}) are merged in and re-validated; a null value removes a
+        field. `updated` is set to today, `created` is kept."""
+        result = await asyncio.to_thread(
+            capture_mod.update_note,
+            vault,
+            filename=filename,
+            content=content,
+            mode=mode,
+            frontmatter=frontmatter,
+        )
         await asyncio.to_thread(vault.reindex_paths, {result["path"]})
         return result
 

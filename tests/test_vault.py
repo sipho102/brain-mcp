@@ -267,7 +267,8 @@ def test_slugify(title: str, expected: str):
     assert slugify(title) == expected
 
 
-def test_slugify_truncates_to_60_chars():
+def test_slugify_truncates_to_80_chars_on_word_boundary():
     long_title = "word " * 30
     slug = slugify(long_title)
-    assert len(slug) <= 60
+    assert len(slug) <= 80
+    assert slug.endswith("-word")
