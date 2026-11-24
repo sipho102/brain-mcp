@@ -16,11 +16,11 @@ from .vault import DATE_FORMAT, VaultIndex, slugify
 
 INBOX_DIR = "00-inbox"
 
-# CAPTURE.md restricts capture() to these three types even though the full
+# CAPTURE.md restricts capture() to these types even though the full
 # vault `type` enum (see CONVENTIONS.md) also has `price-list` — that type
 # is for large structured reference data, never something an LLM captures.
 # topic/status come from CONVENTIONS.md at startup via vault.validate_enum.
-CAPTURE_TYPES = ("document", "memory", "journal")
+CAPTURE_TYPES = ("document", "memory", "journal", "todo")
 KINDS = ("evidence", "inference")
 CONFIDENCES = ("high", "medium", "low")
 

@@ -43,6 +43,7 @@ VAULT_FOLDERS: dict[str, tuple[str, str]] = {
     "documents": ("documents", "Durable know-how, one fact per note, corrected in place. Organised by topic, one level deep."),
     "memories": ("memories", "Small, dated, revisable observations. Flat, no topic subfolders."),
     "journal": ("journal", "Append-only narrative. Current file plus journal/archive/ (excluded from search)."),
+    "todos": ("todos", "Open and done todos. Flat, no topic subfolders."),
     "attachments": ("attachments", "Images and other binary attachments."),
     "meta": ("90-meta", "Conventions, templates, this file."),
 }

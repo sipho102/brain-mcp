@@ -240,7 +240,7 @@ The only write. Creates a new note in `00-inbox/`. Follows `CAPTURE.md`
   `uid`/`domain`/`tags` fields are rejected.
 - On filename collision, append `-2`, `-3`, and so on. **Never overwrite an
   existing file under any circumstance.**
-- Frontmatter: `type` defaults to `document` (`document`/`memory`/`journal`
+- Frontmatter: `type` defaults to `document` (`document`/`memory`/`journal`/`todo`
   only — `price-list` is not a valid capture type), `status` is always
   `current`, `created`/`updated` set to today in `YYYY-MM-DD`. `topic` and
   `when-to-open` are required. `kind` is required when `type: memory`;

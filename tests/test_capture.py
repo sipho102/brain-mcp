@@ -62,6 +62,16 @@ def test_capture_default_type_is_document(vault: VaultIndex):
     assert post.metadata["type"] == "document"
 
 
+def test_capture_accepts_todo_type(vault: VaultIndex):
+    result = capture_mod.capture_note(
+        vault, title="Open Todo", body="body", topic="personal",
+        when_to_open="for testing", source="conversation", type="todo",
+    )
+    post = frontmatter.load(capture_mod.Path(vault.root) / result["path"])
+    assert post.metadata["type"] == "todo"
+    assert post.metadata["status"] == "current"
+
+
 def test_capture_rejects_invalid_topic(vault: VaultIndex):
     with pytest.raises(InvalidEnumError):
         capture_mod.capture_note(

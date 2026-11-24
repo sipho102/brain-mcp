@@ -179,7 +179,7 @@ def build_mcp_server(config: Config, vault: VaultIndex) -> FastMCP:
     ) -> dict[str, str]:
         """Create a new note in 00-inbox/. The only write this server can do.
         Follow CAPTURE.md (vault root): write the fact, not the narrative;
-        one fact per note; type is document/memory/journal; when_to_open is a
+        one fact per note; type is document/memory/journal/todo; when_to_open is a
         retrieval trigger, not a summary; source is required (a URL,
         'conversation', or paperless:<id>); kind (evidence/inference) is
         required when type is memory, and confidence when kind is
